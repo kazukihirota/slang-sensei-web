@@ -3,160 +3,323 @@
 // This enables autocomplete, go to definition, etc.
 
 // Setup type definitions for built-in Supabase Runtime APIs
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { OpenAI } from "npm:openai@4.8.0";
+import "@supabase/functions-js/edge-runtime.d.ts";
 
+// Import modules
+import { analyzeNewSlangTerm, generateExplanation } from "./lib/openai.ts";
+import {
+  cacheExplanation,
+  createSlangEntry,
+  createSlangExamples,
+  getCachedExplanation,
+  recordUserSearch,
+  searchSlang,
+} from "./lib/database.ts";
+import { generateFallbackExplanation, generateHash } from "./lib/utils.ts";
+import type { SlangContext, SlangData } from "./lib/types.ts";
+import { createClient } from "@supabase/supabase-js";
+
+// Environment variables
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")!;
 const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") ?? "gpt-4o-mini";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-type ChatCompletionsClient = Pick<OpenAI, "chat">;
+/**
+ * Handle creation of a new slang entry when not found in database
+ */
+async function handleNewSlangTerm(
+  term: string,
+  userId: string | null,
+): Promise<Response> {
+  console.log(`Creating new slang entry for "${term}"`);
 
-let openAIClient: ChatCompletionsClient | undefined;
-const getOpenAIClient = () => {
-  if (!openAIClient) {
-    openAIClient = new OpenAI({ apiKey: OPENAI_API_KEY });
+  try {
+    // Get structured data from OpenAI
+    const data: SlangData = await analyzeNewSlangTerm(
+      OPENAI_API_KEY,
+      OPENAI_MODEL,
+      term,
+    );
+
+    // Check if it's a valid term
+    if (!data.headword || data.headword === null) {
+      return new Response(
+        `"${term}" is not recognized as a Japanese slang term. Please try another term.`,
+        {
+          status: 404,
+          headers: { "Content-Type": "text/plain" },
+        },
+      );
+    }
+
+    // Create the dictionary entry
+    const entryId = await createSlangEntry(SUPABASE_URL, SERVICE_ROLE, data);
+    console.log("New dictionary entry created with ID:", entryId);
+
+    // Create examples if provided
+    if (
+      data.examples && Array.isArray(data.examples) && data.examples.length > 0
+    ) {
+      await createSlangExamples(
+        SUPABASE_URL,
+        SERVICE_ROLE,
+        entryId,
+        data.examples,
+      );
+    }
+
+    // Now fetch the newly created entry and generate explanation using the same
+    // method as existing terms for consistent formatting
+    const newEntry = await searchSlang(SUPABASE_URL, SERVICE_ROLE, term, 1);
+
+    if (!newEntry || newEntry.length === 0) {
+      throw new Error("Failed to retrieve newly created slang entry");
+    }
+
+    // Generate explanation using the same function as existing terms
+    const explanation = await generateExplanation(
+      OPENAI_API_KEY,
+      OPENAI_MODEL,
+      term,
+      newEntry,
+    );
+
+    // Cache the explanation
+    const hash = await generateHash(term, [entryId]);
+    await cacheExplanation(
+      SUPABASE_URL,
+      SERVICE_ROLE,
+      entryId,
+      hash,
+      explanation,
+    );
+
+    // Record user search (search count is automatically incremented by database trigger)
+    if (userId) {
+      await recordUserSearch(
+        SUPABASE_URL,
+        SERVICE_ROLE,
+        userId,
+        term,
+        entryId,
+      );
+    }
+
+    return new Response(explanation, {
+      headers: { "Content-Type": "text/markdown" },
+    });
+  } catch (error) {
+    console.error("Failed to create new slang entry:", error);
+    if (error instanceof Error) {
+      console.error("Error message:", error.message);
+    }
+    return new Response(
+      `Unable to process "${term}". Please try again or search for an existing term.`,
+      {
+        status: 500,
+        headers: { "Content-Type": "text/plain" },
+      },
+    );
   }
-  return openAIClient;
-};
+}
 
-export const __test = {
-  setOpenAIClient(client: ChatCompletionsClient) {
-    openAIClient = client;
-  },
-  resetOpenAIClient() {
-    openAIClient = undefined;
-  },
-};
+/**
+ * Generate explanation for existing slang entries
+ */
+async function handleExistingSlang(
+  term: string,
+  ctx: SlangContext[],
+): Promise<string> {
+  let answer = "No answer.";
+  let usedOpenAI = false;
 
-export const handler = async (req: Request) => {
-  const { term, proficiency = "B1" } = await req.json();
+  // Try OpenAI if API key is available
+  if (
+    OPENAI_API_KEY && OPENAI_API_KEY !== "sk-test-dummy-key-for-development"
+  ) {
+    console.log("Calling OpenAI API with model:", OPENAI_MODEL);
+
+    try {
+      answer = await generateExplanation(
+        OPENAI_API_KEY,
+        OPENAI_MODEL,
+        term,
+        ctx,
+      );
+      usedOpenAI = true;
+      console.log("OpenAI response received successfully");
+    } catch (error) {
+      console.error("OpenAI request failed:", error);
+      if (error instanceof Error) {
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
+      }
+      // Fall through to basic explanation
+    }
+  } else {
+    console.log("OpenAI API key not available, using fallback");
+  }
+
+  // Generate basic explanation from context if OpenAI unavailable or failed
+  if (!usedOpenAI && ctx.length > 0) {
+    console.log("Using fallback explanation");
+    answer = generateFallbackExplanation(ctx[0]);
+  }
+
+  return answer;
+}
+
+/**
+ * Get authenticated user from Supabase
+ */
+async function getAuthenticatedUser(
+  req: Request,
+): Promise<{ id: string; email?: string } | null> {
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return null;
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+
+    // Create Supabase client with the user's JWT token
+    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    });
+
+    // Get the authenticated user
+    const { data: { user }, error } = await supabase.auth.getUser();
+
+    if (error || !user) {
+      console.error("Failed to get authenticated user:", error);
+      return null;
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+    };
+  } catch (error) {
+    console.error("Failed to authenticate user:", error);
+    return null;
+  }
+}
+
+/**
+ * Main request handler
+ */
+export const handler = async (req: Request): Promise<Response> => {
+  // Parse request
+  const { term } = await req.json();
   if (!term || typeof term !== "string") {
     return new Response("Missing 'term'", { status: 400 });
   }
 
-  // 1) lookup slang + neighbors (SQL RPC: hybrid search)
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/hybrid_slang_search`, {
-    method: "POST",
-    headers: {
-      apikey: SERVICE_ROLE,
-      Authorization: `Bearer ${SERVICE_ROLE}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ q: term, k: 3 }),
-  });
+  // Get authenticated user
+  const user = await getAuthenticatedUser(req);
+  const userId = user?.id || null;
 
-  if (!res.ok) {
-    return new Response("Failed to fetch slang context", { status: 502 });
-  }
+  // 1) Search for slang entries
+  try {
+    const ctx = await searchSlang(SUPABASE_URL, SERVICE_ROLE, term, 3);
+    console.log(`Search results for "${term}":`, ctx.length, "entries found");
 
-  const ctx = await res.json();
+    // If no results found, try to create a new entry using OpenAI
+    if (!ctx || ctx.length === 0) {
+      console.log("No results found, checking OpenAI API key...");
+      console.log("OPENAI_API_KEY exists:", !!OPENAI_API_KEY);
+      console.log(
+        "OPENAI_API_KEY starts with sk-proj:",
+        OPENAI_API_KEY?.startsWith("sk-proj-"),
+      );
 
-  // 2) cache check
-  const hash = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(
-      JSON.stringify({ term, proficiency, ids: ctx.map((c: any) => c.id) }),
-    ),
-  );
-  const hashHex = Array.from(new Uint8Array(hash)).map((b) =>
-    b.toString(16).padStart(2, "0")
-  ).join("");
+      if (
+        !OPENAI_API_KEY ||
+        OPENAI_API_KEY === "sk-test-dummy-key-for-development"
+      ) {
+        console.log("OpenAI API key not available, returning 404");
+        return new Response(
+          `No slang entry found for "${term}". Try searching for popular terms like "草", "やばい", or "エモい".`,
+          {
+            status: 404,
+            headers: { "Content-Type": "text/plain" },
+          },
+        );
+      }
 
-  const cacheRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/explanation_cache?hash=eq.${hashHex}&select=answer_md`,
-    {
-      headers: {
-        apikey: SERVICE_ROLE,
-        Authorization: `Bearer ${SERVICE_ROLE}`,
-      },
-    },
-  );
+      console.log("OpenAI API key available, creating new slang term");
+      return await handleNewSlangTerm(term, userId);
+    }
 
-  if (cacheRes.ok) {
-    const cached = await cacheRes.json();
-    if (cached[0]?.answer_md) {
-      return new Response(cached[0].answer_md, {
+    // 2) Check cache
+    const hash = await generateHash(
+      term,
+      ctx.map((c) => c.id),
+    );
+
+    const cachedAnswer = await getCachedExplanation(
+      SUPABASE_URL,
+      SERVICE_ROLE,
+      hash,
+    );
+
+    if (cachedAnswer) {
+      console.log("Returning cached answer");
+
+      // Record user search even for cached results
+      if (userId) {
+        const entryId = ctx.length > 0 ? ctx[0].id : null;
+        await recordUserSearch(
+          SUPABASE_URL,
+          SERVICE_ROLE,
+          userId,
+          term,
+          entryId,
+        );
+      }
+
+      return new Response(cachedAnswer, {
         headers: { "Content-Type": "text/markdown" },
       });
     }
-  }
 
-  // 3) Generate explanation from context (fallback when OpenAI is unavailable)
-  let answer = "No answer.";
+    // 3) Generate explanation
+    const answer = await handleExistingSlang(term, ctx);
 
-  if (
-    OPENAI_API_KEY && OPENAI_API_KEY !== "sk-test-dummy-key-for-development"
-  ) {
-    // Use OpenAI if valid key is available
-    const prompt = [
-      {
-        role: "system" as const,
-        content:
-          "You are a concise Japanese slang tutor. Keep total under 120 words. JP+EN, register notes.",
-      },
-      {
-        role: "user" as const,
-        content: `Proficiency: ${proficiency}\nContext:\n${
-          ctx.map((c: any) =>
-            `- ${c.headword}: ${c.definition_en} / ${c.definition_ja}\nExamples: ${
-              c.examples?.slice(0, 2).join(" | ")
-            }`
-          ).join("\n")
-        }\nTask: 1) meaning+nuance, 2) 2 JP examples + EN gloss, 3) polite alt if casual/vulgar.`,
-      },
-    ];
+    // 4) Cache the explanation
+    const entryId = ctx.length > 0 ? ctx[0].id : null;
+    await cacheExplanation(
+      SUPABASE_URL,
+      SERVICE_ROLE,
+      entryId,
+      hash,
+      answer,
+    );
 
-    try {
-      const completion = await getOpenAIClient().chat.completions.create({
-        model: OPENAI_MODEL,
-        messages: prompt,
-        max_tokens: 220,
-        temperature: 0.5,
-      });
-      answer = completion.choices?.[0]?.message?.content?.trim() ?? answer;
-    } catch (error) {
-      console.error("OpenAI request failed", error);
-      // Fall through to basic explanation
-    }
-  }
-
-  // Generate basic explanation from context if OpenAI unavailable
-  if (answer === "No answer." && ctx.length > 0) {
-    const first = ctx[0];
-    answer = `## ${first.headword}${first.reading ? ` (${first.reading})` : ""}
-
-**Definition:** ${first.definition_en}
-
-**Japanese:** ${first.definition_ja}
-
-**Register:** ${first.register}${
-      first.polite_equiv ? ` (polite form: ${first.polite_equiv})` : ""
+    // 5) Record user search (search count is automatically incremented by database trigger)
+    if (userId) {
+      await recordUserSearch(
+        SUPABASE_URL,
+        SERVICE_ROLE,
+        userId,
+        term,
+        entryId,
+      );
     }
 
-${
-      first.examples && first.examples.length > 0
-        ? `**Examples:**\n${first.examples.slice(0, 2).join("\n")}`
-        : ""
-    }
-
-${first.notes ? `**Notes:** ${first.notes}` : ""}`;
+    return new Response(answer, {
+      headers: { "Content-Type": "text/markdown" },
+    });
+  } catch (error) {
+    console.error("Request failed:", error);
+    return new Response("Internal server error", { status: 500 });
   }
-
-  // 4) write cache
-  await fetch(`${SUPABASE_URL}/rest/v1/explanation_cache`, {
-    method: "POST",
-    headers: {
-      apikey: SERVICE_ROLE,
-      Authorization: `Bearer ${SERVICE_ROLE}`,
-      "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates",
-    },
-    body: JSON.stringify({ hash: hashHex, answer_md: answer }),
-  });
-
-  return new Response(answer, { headers: { "Content-Type": "text/markdown" } });
 };
 
 Deno.serve(handler);

@@ -1,0 +1,12 @@
+{
+  "name": "jmdict-csv-export",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Export JMdict data to CSV for Supabase import",
+  "main": "export-to-csv.js",
+  "scripts": {
+    "export:csv": "node export-to-csv.js"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
