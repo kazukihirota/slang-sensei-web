@@ -31,12 +31,6 @@ grant update on table explanation_cache to authenticated, service_role;
 grant delete on table explanation_cache to service_role;
 
 -- ============================================================================
--- User profiles table grants
--- ============================================================================
-
-grant all on user_profiles to anon, authenticated, service_role;
-
--- ============================================================================
 -- Search history table grants
 -- ============================================================================
 

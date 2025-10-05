@@ -35,19 +35,6 @@ create table if not exists explanation_cache (
   created_at timestamp default now()
 );
 
--- User profiles
--- This extends auth.users with additional profile information
-create table if not exists user_profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  email text,
-  full_name text,
-  avatar_url text,
-  proficiency_level text check (proficiency_level in ('A2','B1','B2','C1')) default 'B1',
-  total_searches int default 0,
-  created_at timestamp with time zone default now(),
-  updated_at timestamp with time zone default now()
-);
-
 -- Search history
 create table if not exists search_history (
   id uuid primary key default gen_random_uuid(),

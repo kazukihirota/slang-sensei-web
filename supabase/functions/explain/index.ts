@@ -3,7 +3,7 @@
 // This enables autocomplete, go to definition, etc.
 
 // Setup type definitions for built-in Supabase Runtime APIs
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import "@supabase/functions-js/edge-runtime.d.ts";
 
 // Import modules
 import { analyzeNewSlangTerm, generateExplanation } from "./lib/openai.ts";
@@ -17,6 +17,7 @@ import {
 } from "./lib/database.ts";
 import { generateFallbackExplanation, generateHash } from "./lib/utils.ts";
 import type { SlangContext, SlangData } from "./lib/types.ts";
+import { createClient } from "@supabase/supabase-js";
 
 // Environment variables
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")!;
@@ -94,7 +95,7 @@ async function handleNewSlangTerm(
       explanation,
     );
 
-    // Record user search
+    // Record user search (search count is automatically incremented by database trigger)
     if (userId) {
       await recordUserSearch(
         SUPABASE_URL,
@@ -170,21 +171,42 @@ async function handleExistingSlang(
 }
 
 /**
- * Extract user ID from JWT token in Authorization header
+ * Get authenticated user from Supabase
  */
-function getUserIdFromRequest(req: Request): string | null {
+async function getAuthenticatedUser(
+  req: Request,
+): Promise<{ id: string; email?: string } | null> {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return null;
     }
 
-    const token = authHeader.substring(7);
-    // Decode JWT payload (middle part)
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload.sub || null;
+    const token = authHeader.replace("Bearer ", "");
+
+    // Create Supabase client with the user's JWT token
+    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    });
+
+    // Get the authenticated user
+    const { data: { user }, error } = await supabase.auth.getUser();
+
+    if (error || !user) {
+      console.error("Failed to get authenticated user:", error);
+      return null;
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+    };
   } catch (error) {
-    console.error("Failed to extract user ID:", error);
+    console.error("Failed to authenticate user:", error);
     return null;
   }
 }
@@ -199,8 +221,9 @@ export const handler = async (req: Request): Promise<Response> => {
     return new Response("Missing 'term'", { status: 400 });
   }
 
-  // Extract user ID from JWT token
-  const userId = getUserIdFromRequest(req);
+  // Get authenticated user
+  const user = await getAuthenticatedUser(req);
+  const userId = user?.id || null;
 
   // 1) Search for slang entries
   try {
@@ -248,6 +271,19 @@ export const handler = async (req: Request): Promise<Response> => {
 
     if (cachedAnswer) {
       console.log("Returning cached answer");
+
+      // Record user search even for cached results
+      if (userId) {
+        const entryId = ctx.length > 0 ? ctx[0].id : null;
+        await recordUserSearch(
+          SUPABASE_URL,
+          SERVICE_ROLE,
+          userId,
+          term,
+          entryId,
+        );
+      }
+
       return new Response(cachedAnswer, {
         headers: { "Content-Type": "text/markdown" },
       });
@@ -266,7 +302,7 @@ export const handler = async (req: Request): Promise<Response> => {
       answer,
     );
 
-    // 5) Record user search
+    // 5) Record user search (search count is automatically incremented by database trigger)
     if (userId) {
       await recordUserSearch(
         SUPABASE_URL,

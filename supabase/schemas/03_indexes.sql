@@ -20,9 +20,6 @@ create index if not exists idx_explanation_cache_entry_id on explanation_cache(e
 create index if not exists idx_explanation_cache_hash on explanation_cache(hash);
 create index if not exists idx_explanation_cache_created_at on explanation_cache(created_at desc);
 
--- User profiles indexes
-create index if not exists idx_user_profiles_email on user_profiles(email);
-
 -- Search history indexes
 create index if not exists idx_search_history_user_id on search_history(user_id);
 create index if not exists idx_search_history_entry_id on search_history(entry_id);

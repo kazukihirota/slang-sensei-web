@@ -32,16 +32,15 @@ export interface SlangExample {
     created_at: string;
 }
 
-export interface UserProfile {
+// User profile is now just the auth user data
+export type UserProfile = {
     id: string;
     email: string | null;
-    full_name: string | null;
-    avatar_url: string | null;
-    proficiency_level: string;
-    total_searches: number;
+    full_name?: string | undefined;
+    avatar_url?: string | undefined;
     created_at: string;
     updated_at: string;
-}
+};
 
 export interface SearchHistory {
     id: string;
@@ -77,36 +76,33 @@ export async function getSlangExplanation(
     return await response.text();
 }
 
-// Get user profile
+// Get user profile (now just returns auth user data)
 export async function getUserProfile(): Promise<UserProfile | null> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
-    const { data, error } = await supabase
-        .from("user_profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-    if (error) {
-        console.error("Error fetching user profile:", error);
-        return null;
-    }
-
-    return data;
+    return {
+        id: user.id,
+        email: user.email ?? null,
+        full_name: user.user_metadata?.full_name,
+        avatar_url: user.user_metadata?.avatar_url,
+        created_at: user.created_at,
+        updated_at: user.updated_at || user.created_at,
+    };
 }
 
-// Update user profile
+// Update user profile (updates auth user metadata)
 export async function updateUserProfile(
-    updates: Partial<Pick<UserProfile, "full_name" | "proficiency_level">>,
+    updates: Partial<Pick<UserProfile, "full_name">>,
 ): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Not authenticated");
 
-    const { error } = await supabase
-        .from("user_profiles")
-        .update(updates)
-        .eq("id", user.id);
+    const { error } = await supabase.auth.updateUser({
+        data: {
+            full_name: updates.full_name,
+        },
+    });
 
     if (error) {
         throw new Error(`Failed to update profile: ${error.message}`);
@@ -133,25 +129,4 @@ export async function getSearchHistory(
     }
 
     return data || [];
-}
-
-// Save search to history
-export async function saveSearchHistory(
-    searchTerm: string,
-    entryId?: string,
-): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { error } = await supabase
-        .from("search_history")
-        .insert({
-            user_id: user.id,
-            search_term: searchTerm,
-            entry_id: entryId || null,
-        });
-
-    if (error) {
-        console.error("Error saving search history:", error);
-    }
 }

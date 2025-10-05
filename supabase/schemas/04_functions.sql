@@ -197,25 +197,6 @@ begin
 end;
 $$;
 
--- Function to automatically create user profile when user signs up
-create or replace function handle_new_user()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  insert into public.user_profiles (id, email, full_name, avatar_url)
-  values (
-    new.id,
-    new.email,
-    new.raw_user_meta_data->>'full_name',
-    new.raw_user_meta_data->>'avatar_url'
-  );
-  return new;
-end;
-$$;
-
 -- Function to update updated_at timestamp
 create or replace function handle_updated_at()
 returns trigger
@@ -227,60 +208,12 @@ begin
 end;
 $$;
 
--- Function to increment search count
-create or replace function increment_user_search_count()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  update public.user_profiles
-  set total_searches = total_searches + 1
-  where id = new.user_id;
-  return new;
-end;
-$$;
-
--- ============================================================================
--- Triggers
--- ============================================================================
-
--- Trigger to create profile on user signup
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure handle_new_user();
-
--- Trigger to update updated_at on user_profiles
-drop trigger if exists on_user_profile_updated on user_profiles;
-create trigger on_user_profile_updated
-  before update on user_profiles
-  for each row execute procedure handle_updated_at();
-
--- Trigger to increment search count when a search is recorded
-drop trigger if exists on_search_recorded on search_history;
-create trigger on_search_recorded
-  after insert on search_history
-  for each row execute procedure increment_user_search_count();
-
 -- ============================================================================
 -- Row Level Security (RLS) Policies
 -- ============================================================================
 
 -- Enable RLS
-alter table user_profiles enable row level security;
 alter table search_history enable row level security;
-
--- User profiles: Users can read their own profile
-create policy "Users can view own profile"
-  on user_profiles for select
-  using (auth.uid() = id);
-
--- User profiles: Users can update their own profile
-create policy "Users can update own profile"
-  on user_profiles for update
-  using (auth.uid() = id);
 
 -- Search history: Users can view their own search history
 create policy "Users can view own search history"
@@ -291,11 +224,6 @@ create policy "Users can view own search history"
 create policy "Users can insert own searches"
   on search_history for insert
   with check (auth.uid() = user_id);
-
--- Service role can do everything (for Edge Functions)
-create policy "Service role has full access to profiles"
-  on user_profiles for all
-  using (auth.role() = 'service_role');
 
 create policy "Service role has full access to search history"
   on search_history for all
