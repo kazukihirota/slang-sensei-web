@@ -67,7 +67,7 @@ export default function SlangDictionary() {
                 className='flex items-center space-x-1 px-3 py-1.5 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors'
               >
                 <LogOut className='h-4 w-4' />
-                <span>Sign out</span>
+                <span className='hidden sm:inline'>Sign out</span>
               </button>
             </div>
           </div>
@@ -79,7 +79,7 @@ export default function SlangDictionary() {
           {/* Search Section */}
           <div className='lg:col-span-2 space-y-6'>
             <div className='bg-white rounded-xl shadow-sm border border-purple-100 p-6'>
-              <h2 className='text-xl font-semibold mb-4 flex items-center'>
+              <h2 className='hidden sm:flex text-xl font-semibold mb-4 items-center'>
                 <Search className='h-5 w-5 mr-2 text-purple-600' />
                 Search Japanese Slang
               </h2>
