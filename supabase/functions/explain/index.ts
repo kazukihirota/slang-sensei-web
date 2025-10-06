@@ -18,6 +18,7 @@ import {
 import { generateFallbackExplanation, generateHash } from "./lib/utils.ts";
 import type { SlangContext, SlangData } from "./lib/types.ts";
 import { createClient } from "@supabase/supabase-js";
+import { corsHeaders } from "../_shared/cors.ts";
 
 // Environment variables
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")!;
@@ -48,7 +49,7 @@ async function handleNewSlangTerm(
         `"${term}" is not recognized as a Japanese slang term. Please try another term.`,
         {
           status: 404,
-          headers: { "Content-Type": "text/plain" },
+          headers: { ...corsHeaders, "Content-Type": "text/plain" },
         },
       );
     }
@@ -56,6 +57,7 @@ async function handleNewSlangTerm(
     // Create the dictionary entry
     const entryId = await createSlangEntry(SUPABASE_URL, SERVICE_ROLE, data);
     console.log("New dictionary entry created with ID:", entryId);
+    console.log("Created entry data:", JSON.stringify(data, null, 2));
 
     // Create examples if provided
     if (
@@ -69,21 +71,34 @@ async function handleNewSlangTerm(
       );
     }
 
-    // Now fetch the newly created entry and generate explanation using the same
-    // method as existing terms for consistent formatting
-    const newEntry = await searchSlang(SUPABASE_URL, SERVICE_ROLE, term, 1);
-
-    if (!newEntry || newEntry.length === 0) {
-      throw new Error("Failed to retrieve newly created slang entry");
-    }
+    // Convert the created data to SlangContext format for explanation generation
+    const newEntry: SlangContext[] = [{
+      id: entryId,
+      headword: data.headword || "",
+      reading: data.reading,
+      pos: data.pos,
+      register: data.register || "casual",
+      dialect: data.dialect,
+      tags: data.tags,
+      definition_ja: data.definition_ja,
+      definition_en: data.definition_en,
+      polite_equiv: data.polite_equiv,
+      notes: data.notes,
+      popularity: 1,
+      entry_type: "slang",
+      created_at: new Date().toISOString(),
+      examples: data.examples?.map((ex) => ex.jp) || [],
+    }];
 
     // Generate explanation using the same function as existing terms
+    console.log("Generating explanation for new entry:", newEntry[0].headword);
     const explanation = await generateExplanation(
       OPENAI_API_KEY,
       OPENAI_MODEL,
       term,
       newEntry,
     );
+    console.log("Explanation generated successfully");
 
     // Cache the explanation
     const hash = await generateHash(term, [entryId]);
@@ -107,7 +122,7 @@ async function handleNewSlangTerm(
     }
 
     return new Response(explanation, {
-      headers: { "Content-Type": "text/markdown" },
+      headers: { ...corsHeaders, "Content-Type": "text/markdown" },
     });
   } catch (error) {
     console.error("Failed to create new slang entry:", error);
@@ -118,7 +133,7 @@ async function handleNewSlangTerm(
       `Unable to process "${term}". Please try again or search for an existing term.`,
       {
         status: 500,
-        headers: { "Content-Type": "text/plain" },
+        headers: { ...corsHeaders, "Content-Type": "text/plain" },
       },
     );
   }
@@ -215,66 +230,104 @@ async function getAuthenticatedUser(
  * Main request handler
  */
 export const handler = async (req: Request): Promise<Response> => {
-  // Parse request
-  const { term } = await req.json();
-  if (!term || typeof term !== "string") {
-    return new Response("Missing 'term'", { status: 400 });
+  // This is needed if you're planning to invoke your function from a browser.
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
   }
 
-  // Get authenticated user
-  const user = await getAuthenticatedUser(req);
-  const userId = user?.id || null;
-
-  // 1) Search for slang entries
   try {
-    const ctx = await searchSlang(SUPABASE_URL, SERVICE_ROLE, term, 3);
-    console.log(`Search results for "${term}":`, ctx.length, "entries found");
-
-    // If no results found, try to create a new entry using OpenAI
-    if (!ctx || ctx.length === 0) {
-      console.log("No results found, checking OpenAI API key...");
-      console.log("OPENAI_API_KEY exists:", !!OPENAI_API_KEY);
-      console.log(
-        "OPENAI_API_KEY starts with sk-proj:",
-        OPENAI_API_KEY?.startsWith("sk-proj-"),
-      );
-
-      if (
-        !OPENAI_API_KEY ||
-        OPENAI_API_KEY === "sk-test-dummy-key-for-development"
-      ) {
-        console.log("OpenAI API key not available, returning 404");
-        return new Response(
-          `No slang entry found for "${term}". Try searching for popular terms like "草", "やばい", or "エモい".`,
-          {
-            status: 404,
-            headers: { "Content-Type": "text/plain" },
-          },
-        );
-      }
-
-      console.log("OpenAI API key available, creating new slang term");
-      return await handleNewSlangTerm(term, userId);
+    // Parse request
+    const { term } = await req.json();
+    if (!term || typeof term !== "string") {
+      return new Response(JSON.stringify({ error: "Missing 'term'" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
     }
 
-    // 2) Check cache
-    const hash = await generateHash(
-      term,
-      ctx.map((c) => c.id),
-    );
+    // Get authenticated user
+    const user = await getAuthenticatedUser(req);
+    const userId = user?.id || null;
 
-    const cachedAnswer = await getCachedExplanation(
-      SUPABASE_URL,
-      SERVICE_ROLE,
-      hash,
-    );
+    // 1) Search for slang entries
+    try {
+      const ctx = await searchSlang(SUPABASE_URL, SERVICE_ROLE, term, 3);
+      console.log(`Search results for "${term}":`, ctx.length, "entries found");
 
-    if (cachedAnswer) {
-      console.log("Returning cached answer");
+      // If no results found, try to create a new entry using OpenAI
+      if (!ctx || ctx.length === 0) {
+        console.log("No results found, checking OpenAI API key...");
+        console.log("OPENAI_API_KEY exists:", !!OPENAI_API_KEY);
+        console.log(
+          "OPENAI_API_KEY starts with sk-proj:",
+          OPENAI_API_KEY?.startsWith("sk-proj-"),
+        );
 
-      // Record user search even for cached results
+        if (
+          !OPENAI_API_KEY ||
+          OPENAI_API_KEY === "sk-test-dummy-key-for-development"
+        ) {
+          console.log("OpenAI API key not available, returning 404");
+          return new Response(
+            `No slang entry found for "${term}". Try searching for popular terms like "草", "やばい", or "エモい".`,
+            {
+              status: 404,
+              headers: { ...corsHeaders, "Content-Type": "text/plain" },
+            },
+          );
+        }
+
+        console.log("OpenAI API key available, creating new slang term");
+        return await handleNewSlangTerm(term, userId);
+      }
+
+      // 2) Check cache
+      const hash = await generateHash(
+        term,
+        ctx.map((c) => c.id),
+      );
+
+      const cachedAnswer = await getCachedExplanation(
+        SUPABASE_URL,
+        SERVICE_ROLE,
+        hash,
+      );
+
+      if (cachedAnswer) {
+        console.log("Returning cached answer");
+
+        // Record user search even for cached results
+        if (userId) {
+          const entryId = ctx.length > 0 ? ctx[0].id : null;
+          await recordUserSearch(
+            SUPABASE_URL,
+            SERVICE_ROLE,
+            userId,
+            term,
+            entryId,
+          );
+        }
+
+        return new Response(cachedAnswer, {
+          headers: { ...corsHeaders, "Content-Type": "text/markdown" },
+        });
+      }
+
+      // 3) Generate explanation
+      const answer = await handleExistingSlang(term, ctx);
+
+      // 4) Cache the explanation
+      const entryId = ctx.length > 0 ? ctx[0].id : null;
+      await cacheExplanation(
+        SUPABASE_URL,
+        SERVICE_ROLE,
+        entryId,
+        hash,
+        answer,
+      );
+
+      // 5) Record user search (search count is automatically incremented by database trigger)
       if (userId) {
-        const entryId = ctx.length > 0 ? ctx[0].id : null;
         await recordUserSearch(
           SUPABASE_URL,
           SERVICE_ROLE,
@@ -284,41 +337,22 @@ export const handler = async (req: Request): Promise<Response> => {
         );
       }
 
-      return new Response(cachedAnswer, {
-        headers: { "Content-Type": "text/markdown" },
+      return new Response(answer, {
+        headers: { ...corsHeaders, "Content-Type": "text/markdown" },
+      });
+    } catch (error) {
+      console.error("Request failed:", error);
+      return new Response(JSON.stringify({ error: "Internal server error" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
       });
     }
-
-    // 3) Generate explanation
-    const answer = await handleExistingSlang(term, ctx);
-
-    // 4) Cache the explanation
-    const entryId = ctx.length > 0 ? ctx[0].id : null;
-    await cacheExplanation(
-      SUPABASE_URL,
-      SERVICE_ROLE,
-      entryId,
-      hash,
-      answer,
-    );
-
-    // 5) Record user search (search count is automatically incremented by database trigger)
-    if (userId) {
-      await recordUserSearch(
-        SUPABASE_URL,
-        SERVICE_ROLE,
-        userId,
-        term,
-        entryId,
-      );
-    }
-
-    return new Response(answer, {
-      headers: { "Content-Type": "text/markdown" },
-    });
   } catch (error) {
     console.error("Request failed:", error);
-    return new Response("Internal server error", { status: 500 });
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
   }
 };
 
