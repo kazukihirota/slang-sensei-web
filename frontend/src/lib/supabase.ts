@@ -49,6 +49,70 @@ export interface SearchHistory {
     created_at: string;
 }
 
+// Cache management for optimistic UI
+const CACHE_KEY_PREFIX = "slang_cache_";
+const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+interface CachedExplanation {
+    term: string;
+    explanation: string;
+    timestamp: number;
+}
+
+export function getCachedExplanation(term: string): string | null {
+    try {
+        const cached = localStorage.getItem(CACHE_KEY_PREFIX + term);
+        if (!cached) return null;
+
+        const data: CachedExplanation = JSON.parse(cached);
+
+        // Check if cache is still valid
+        if (Date.now() - data.timestamp > CACHE_EXPIRY_MS) {
+            localStorage.removeItem(CACHE_KEY_PREFIX + term);
+            return null;
+        }
+
+        return data.explanation;
+    } catch {
+        return null;
+    }
+}
+
+export function setCachedExplanation(term: string, explanation: string): void {
+    try {
+        const data: CachedExplanation = {
+            term,
+            explanation,
+            timestamp: Date.now(),
+        };
+        localStorage.setItem(CACHE_KEY_PREFIX + term, JSON.stringify(data));
+    } catch (error) {
+        // Silently fail if localStorage is full or unavailable
+        console.warn("Failed to cache explanation:", error);
+    }
+}
+
+export function clearExpiredCache(): void {
+    try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key?.startsWith(CACHE_KEY_PREFIX)) {
+                const cached = localStorage.getItem(key);
+                if (cached) {
+                    const data: CachedExplanation = JSON.parse(cached);
+                    if (Date.now() - data.timestamp > CACHE_EXPIRY_MS) {
+                        keysToRemove.push(key);
+                    }
+                }
+            }
+        }
+        keysToRemove.forEach((key) => localStorage.removeItem(key));
+    } catch {
+        // Silently fail
+    }
+}
+
 // API function to get explanation from our Edge function
 export async function getSlangExplanation(
     term: string,
@@ -65,7 +129,7 @@ export async function getSlangExplanation(
             "Authorization": `Bearer ${session.access_token}`,
             "Content-Type": "application/json",
         },
-        body: JSON.stringify({ term }),
+        body: JSON.stringify({ term, stream: false }),
     });
 
     if (!response.ok) {
@@ -73,6 +137,49 @@ export async function getSlangExplanation(
     }
 
     return await response.text();
+}
+
+// API function to get explanation with streaming
+export async function getSlangExplanationStream(
+    term: string,
+    onChunk: (chunk: string) => void,
+): Promise<void> {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+        throw new Error("Please sign in to get explanations");
+    }
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/explain`, {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ term, stream: true }),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to get explanation: ${response.statusText}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+        throw new Error("Response body is not readable");
+    }
+
+    const decoder = new TextDecoder();
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            onChunk(chunk);
+        }
+    } finally {
+        reader.releaseLock();
+    }
 }
 
 // Get user profile (now just returns auth user data)

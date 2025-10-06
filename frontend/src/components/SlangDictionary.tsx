@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react';
 import {
   supabase,
-  getSlangExplanation,
+  getSlangExplanationStream,
   getSearchHistory,
+  getCachedExplanation,
+  setCachedExplanation,
+  clearExpiredCache,
   type SearchHistory,
 } from '../lib/supabase';
-import { Search, LogOut, Book, Sparkles } from 'lucide-react';
+import { Search, LogOut, Book, Sparkles, Zap } from 'lucide-react';
 
 export default function SlangDictionary() {
   const [searchTerm, setSearchTerm] = useState('');
   const [explanation, setExplanation] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isFromCache, setIsFromCache] = useState(false);
   const [recentTerms, setRecentTerms] = useState<SearchHistory[]>([]);
 
   useEffect(() => {
@@ -20,6 +24,9 @@ export default function SlangDictionary() {
       setRecentTerms(history);
     };
     loadRecentSearches();
+
+    // Clear expired cache on mount
+    clearExpiredCache();
   }, []);
 
   const handleSearch = async (term: string = searchTerm) => {
@@ -27,10 +34,33 @@ export default function SlangDictionary() {
 
     try {
       setLoading(true);
-      const result = await getSlangExplanation(term);
-      setExplanation(result);
+      setIsFromCache(false);
 
-      // Reload recent searches from database
+      // Check local cache first for instant results
+      const cached = getCachedExplanation(term);
+      if (cached) {
+        setExplanation(cached);
+        setIsFromCache(true);
+        setLoading(false);
+
+        // Still reload recent searches in background
+        getSearchHistory(5).then(setRecentTerms);
+        return;
+      }
+
+      setExplanation(''); // Clear previous explanation
+
+      // Use streaming for real-time updates
+      let fullExplanation = '';
+      await getSlangExplanationStream(term, (chunk) => {
+        fullExplanation += chunk;
+        setExplanation(fullExplanation);
+      });
+
+      // Cache the result for next time
+      setCachedExplanation(term, fullExplanation);
+
+      // Reload recent searches from database after completion
       const history = await getSearchHistory(5);
       setRecentTerms(history);
     } catch (error) {
@@ -113,9 +143,17 @@ export default function SlangDictionary() {
             {/* Explanation Result */}
             {explanation && (
               <div className='bg-white rounded-xl shadow-sm border border-purple-100 p-6'>
-                <h3 className='text-lg font-semibold mb-4 flex items-center'>
-                  <Sparkles className='h-5 w-5 mr-2 text-purple-600' />
-                  Explanation
+                <h3 className='text-lg font-semibold mb-4 flex items-center justify-between'>
+                  <div className='flex items-center'>
+                    <Sparkles className='h-5 w-5 mr-2 text-purple-600' />
+                    Explanation
+                  </div>
+                  {isFromCache && (
+                    <span className='flex items-center text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full'>
+                      <Zap className='h-3 w-3 mr-1' />
+                      Instant (Cached)
+                    </span>
+                  )}
                 </h3>
                 <div
                   className='prose prose-sm max-w-none text-gray-700'

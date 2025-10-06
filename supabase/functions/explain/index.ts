@@ -6,7 +6,11 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 
 // Import modules
-import { analyzeNewSlangTerm, generateExplanation } from "./lib/openai.ts";
+import {
+  analyzeNewSlangTerm,
+  generateExplanation,
+  generateExplanationStream,
+} from "./lib/openai.ts";
 import {
   cacheExplanation,
   createSlangEntry,
@@ -78,25 +82,25 @@ async function handleNewSlangTerm(
       explanation.substring(0, 50) + "...",
     );
 
-    // Cache the explanation
+    // Cache the explanation (fire-and-forget)
     const hash = await generateHash(term, [entryId]);
-    await cacheExplanation(
+    cacheExplanation(
       SUPABASE_URL,
       SERVICE_ROLE,
       entryId,
       hash,
       explanation,
-    );
+    ).catch((error) => console.error("Failed to cache explanation:", error));
 
-    // Record user search (search count is automatically incremented by database trigger)
+    // Record user search (fire-and-forget)
     if (userId) {
-      await recordUserSearch(
+      recordUserSearch(
         SUPABASE_URL,
         SERVICE_ROLE,
         userId,
         term,
         entryId,
-      );
+      ).catch((error) => console.error("Failed to record search:", error));
     }
 
     return new Response(explanation, {
@@ -115,6 +119,85 @@ async function handleNewSlangTerm(
       },
     );
   }
+}
+
+/**
+ * Generate explanation for existing slang entries with streaming
+ */
+function handleExistingSlangStream(
+  term: string,
+  ctx: SlangContext[],
+  hash: string,
+  entryId: string | null,
+  userId: string | null,
+): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        if (
+          !OPENAI_API_KEY ||
+          OPENAI_API_KEY === "sk-test-dummy-key-for-development"
+        ) {
+          // Use fallback
+          const answer = ctx.length > 0
+            ? generateFallbackExplanation(ctx[0])
+            : "No answer available.";
+          controller.enqueue(encoder.encode(answer));
+          controller.close();
+
+          // Cache and record (fire-and-forget)
+          cacheExplanation(SUPABASE_URL, SERVICE_ROLE, entryId, hash, answer)
+            .catch((error) => console.error("Failed to cache:", error));
+          if (userId) {
+            recordUserSearch(SUPABASE_URL, SERVICE_ROLE, userId, term, entryId)
+              .catch((error) => console.error("Failed to record:", error));
+          }
+          return;
+        }
+
+        console.log("Streaming from OpenAI with model:", OPENAI_MODEL);
+        const stream = await generateExplanationStream(
+          OPENAI_API_KEY,
+          OPENAI_MODEL,
+          term,
+          ctx,
+        );
+
+        // Accumulate the full answer for caching
+        let fullAnswer = "";
+        const reader = stream.getReader();
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = new TextDecoder().decode(value);
+            fullAnswer += chunk;
+            controller.enqueue(value);
+          }
+        } finally {
+          reader.releaseLock();
+        }
+
+        controller.close();
+        console.log("Stream completed");
+
+        // Cache the full answer and record search (fire-and-forget)
+        cacheExplanation(SUPABASE_URL, SERVICE_ROLE, entryId, hash, fullAnswer)
+          .catch((error) => console.error("Failed to cache:", error));
+        if (userId) {
+          recordUserSearch(SUPABASE_URL, SERVICE_ROLE, userId, term, entryId)
+            .catch((error) => console.error("Failed to record:", error));
+        }
+      } catch (error) {
+        console.error("Stream error:", error);
+        controller.error(error);
+      }
+    },
+  });
 }
 
 /**
@@ -215,7 +298,7 @@ export const handler = async (req: Request): Promise<Response> => {
 
   try {
     // Parse request
-    const { term } = await req.json();
+    const { term, stream } = await req.json();
     if (!term || typeof term !== "string") {
       return new Response(JSON.stringify({ error: "Missing 'term'" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -223,13 +306,17 @@ export const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // Get authenticated user
-    const user = await getAuthenticatedUser(req);
-    const userId = user?.id || null;
+    // Enable streaming by default for better UX
+    const useStreaming = stream !== false;
 
-    // 1) Search for slang entries
+    // 1) Search for slang entries and get user in parallel
     try {
-      const ctx = await searchSlang(SUPABASE_URL, SERVICE_ROLE, term, 3);
+      const [ctx, user] = await Promise.all([
+        searchSlang(SUPABASE_URL, SERVICE_ROLE, term, 3),
+        getAuthenticatedUser(req),
+      ]);
+
+      const userId = user?.id || null;
       console.log(`Search results for "${term}":`, ctx.length, "entries found");
 
       // If no results found, try to create a new entry using OpenAI
@@ -274,16 +361,16 @@ export const handler = async (req: Request): Promise<Response> => {
       if (cachedAnswer) {
         console.log("Returning cached answer");
 
-        // Record user search even for cached results
+        // Record user search even for cached results (fire-and-forget)
         if (userId) {
           const entryId = ctx.length > 0 ? ctx[0].id : null;
-          await recordUserSearch(
+          recordUserSearch(
             SUPABASE_URL,
             SERVICE_ROLE,
             userId,
             term,
             entryId,
-          );
+          ).catch((error) => console.error("Failed to record search:", error));
         }
 
         return new Response(cachedAnswer, {
@@ -291,33 +378,52 @@ export const handler = async (req: Request): Promise<Response> => {
         });
       }
 
-      // 3) Generate explanation
-      const answer = await handleExistingSlang(term, ctx);
-
-      // 4) Cache the explanation
+      // 3) Generate explanation with streaming support
       const entryId = ctx.length > 0 ? ctx[0].id : null;
-      await cacheExplanation(
-        SUPABASE_URL,
-        SERVICE_ROLE,
-        entryId,
-        hash,
-        answer,
-      );
 
-      // 5) Record user search (search count is automatically incremented by database trigger)
-      if (userId) {
-        await recordUserSearch(
+      if (useStreaming) {
+        const stream = handleExistingSlangStream(
+          term,
+          ctx,
+          hash,
+          entryId,
+          userId,
+        );
+        return new Response(stream, {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "text/markdown",
+            "Transfer-Encoding": "chunked",
+          },
+        });
+      } else {
+        const answer = await handleExistingSlang(term, ctx);
+
+        // Cache and record (fire-and-forget)
+        cacheExplanation(
           SUPABASE_URL,
           SERVICE_ROLE,
-          userId,
-          term,
           entryId,
+          hash,
+          answer,
+        ).catch((error) =>
+          console.error("Failed to cache explanation:", error)
         );
-      }
 
-      return new Response(answer, {
-        headers: { ...corsHeaders, "Content-Type": "text/markdown" },
-      });
+        if (userId) {
+          recordUserSearch(
+            SUPABASE_URL,
+            SERVICE_ROLE,
+            userId,
+            term,
+            entryId,
+          ).catch((error) => console.error("Failed to record search:", error));
+        }
+
+        return new Response(answer, {
+          headers: { ...corsHeaders, "Content-Type": "text/markdown" },
+        });
+      }
     } catch (error) {
       console.error("Request failed:", error);
       return new Response(JSON.stringify({ error: "Internal server error" }), {

@@ -37,3 +37,5 @@ export interface CreateSlangRequest {
   term: string;
   data: SlangData;
 }
+
+export type Language = "Japanese" | "English";

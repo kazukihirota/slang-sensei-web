@@ -1,5 +1,7 @@
 // Utility functions
 
+import type { Language } from "./types.ts";
+
 /**
  * Generate a hash from search parameters for caching
  */
@@ -16,6 +18,12 @@ export async function generateHash(
   return Array.from(new Uint8Array(hash))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
+}
+
+export function detectLanguage(text: string): Language {
+  const japaneseRegex = /[\u3040-\u30FF\u4E00-\u9FFF\uFF66-\uFF9D]/;
+  if (japaneseRegex.test(text)) return "Japanese";
+  return "English";
 }
 
 /**
