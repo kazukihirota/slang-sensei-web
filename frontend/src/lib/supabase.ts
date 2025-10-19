@@ -146,16 +146,18 @@ export async function getSlangExplanationStream(
 ): Promise<void> {
     const { data: { session } } = await supabase.auth.getSession();
 
-    if (!session) {
-        throw new Error("Please sign in to get explanations");
+    // Build headers - include auth token if available
+    const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+    };
+
+    if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
     }
 
     const response = await fetch(`${supabaseUrl}/functions/v1/explain`, {
         method: "POST",
-        headers: {
-            "Authorization": `Bearer ${session.access_token}`,
-            "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({ term, stream: true }),
     });
 
