@@ -30,11 +30,11 @@ export default function Auth() {
   };
 
   return (
-    <div className='min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 flex items-center justify-center p-4'>
+    <div className='min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-indigo-100 flex items-center justify-center p-4'>
       <div className='w-full max-w-md'>
         {/* Logo and Brand */}
         <div className='text-center mb-8'>
-          <div className='inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl mb-4 shadow-xl'>
+          <div className='inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl mb-4 shadow-xl'>
             <BookOpen className='w-8 h-8 text-white' />
           </div>
           <h1 className='text-4xl font-bold text-gray-900 mb-2'>
@@ -60,9 +60,9 @@ export default function Auth() {
                 We've sent a magic link to{' '}
                 <span className='text-gray-900 font-medium'>{email}</span>
               </p>
-              <div className='bg-purple-50 border border-purple-100 rounded-xl p-4 mb-6'>
+              <div className='bg-indigo-50 border border-indigo-100 rounded-xl p-4 mb-6'>
                 <div className='flex items-start gap-3'>
-                  <Sparkles className='w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5' />
+                  <Sparkles className='w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5' />
                   <div className='text-left'>
                     <p className='text-gray-700 text-sm mb-2'>
                       Click the link in your email to sign in. No password
@@ -76,7 +76,7 @@ export default function Auth() {
               </div>
               <button
                 onClick={() => setSuccess(false)}
-                className='text-purple-600 hover:text-purple-700 font-medium text-sm transition-colors'
+                className='text-indigo-600 hover:text-indigo-700 font-medium text-sm transition-colors'
               >
                 Use a different email
               </button>
@@ -107,7 +107,7 @@ export default function Auth() {
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder='your@email.com'
                       required
-                      className='w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all'
+                      className='w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all'
                     />
                   </div>
                 </div>
@@ -123,7 +123,7 @@ export default function Auth() {
                 <button
                   type='submit'
                   disabled={loading}
-                  className='w-full py-3 px-4 bg-gradient-to-r from-purple-500 to-pink-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100'
+                  className='w-full py-3 px-4 bg-gradient-to-r from-indigo-500 to-indigo-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100'
                 >
                   {loading ? (
                     <span className='flex items-center justify-center'>
