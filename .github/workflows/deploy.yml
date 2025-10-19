@@ -26,18 +26,18 @@ jobs:
       - name: Verify Supabase CLI installation
         run: supabase --version
 
+      - name: Link to Supabase project
+        run: supabase link --project-ref $PROJECT_ID --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
+
       - name: Deploy Supabase Functions
         run: |
           echo "📦 Deploying Supabase Edge Functions..."
-          supabase functions deploy --project-ref $PROJECT_ID
-
-      - name: Link to Supabase project
-        run: supabase link --project-ref $PROJECT_ID
+          supabase functions deploy
 
       - name: Deploy Database Migrations
         run: |
           echo "🗄️ Deploying database migrations..."
-          supabase db push --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
+          supabase db push
 
       - name: Deployment Summary
         if: success()
