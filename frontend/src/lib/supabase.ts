@@ -113,6 +113,49 @@ export function clearExpiredCache(): void {
     }
 }
 
+// Local search history for unauthenticated users
+const LOCAL_HISTORY_KEY = "slang_local_history";
+const MAX_LOCAL_HISTORY = 10;
+
+export interface LocalSearchHistory {
+    term: string;
+    timestamp: number;
+}
+
+export function getLocalSearchHistory(): LocalSearchHistory[] {
+    try {
+        const history = localStorage.getItem(LOCAL_HISTORY_KEY);
+        if (!history) return [];
+        return JSON.parse(history);
+    } catch {
+        return [];
+    }
+}
+
+export function addToLocalSearchHistory(term: string): void {
+    try {
+        const history = getLocalSearchHistory();
+        // Remove duplicate if exists
+        const filtered = history.filter((item) => item.term !== term);
+        // Add new term at the beginning
+        const updated = [{ term, timestamp: Date.now() }, ...filtered].slice(
+            0,
+            MAX_LOCAL_HISTORY,
+        );
+        localStorage.setItem(LOCAL_HISTORY_KEY, JSON.stringify(updated));
+    } catch (error) {
+        console.warn("Failed to save to local history:", error);
+    }
+}
+
+export function clearLocalSearchHistory(): void {
+    try {
+        localStorage.removeItem(LOCAL_HISTORY_KEY);
+    } catch {
+        // Silently fail
+    }
+}
+
 // API function to get explanation from our Edge function
 export async function getSlangExplanation(
     term: string,

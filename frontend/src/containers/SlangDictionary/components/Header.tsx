@@ -3,11 +3,11 @@ import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface HeaderProps {
   user: SupabaseUser | null;
-  onLogin: () => void;
+  onSignup?: () => void;
   onLogout: () => void;
 }
 
-export default function Header({ user, onLogin, onLogout }: HeaderProps) {
+export default function Header({ user, onSignup, onLogout }: HeaderProps) {
   return (
     <header className='bg-white/80 backdrop-blur-sm shadow-sm border-b border-indigo-100'>
       <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
@@ -37,7 +37,7 @@ export default function Header({ user, onLogin, onLogout }: HeaderProps) {
               </>
             ) : (
               <button
-                onClick={onLogin}
+                onClick={onSignup}
                 className='flex items-center space-x-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors shadow-sm'
               >
                 <LogIn className='h-4 w-4' />

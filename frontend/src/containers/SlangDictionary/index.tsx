@@ -6,17 +6,17 @@ import {
   getCachedExplanation,
   setCachedExplanation,
   clearExpiredCache,
+  getLocalSearchHistory,
+  addToLocalSearchHistory,
   type SearchHistory,
+  type LocalSearchHistory,
 } from '../../lib/supabase';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
-import AuthModal from '../Auth/AuthModal';
 import Header from './components/Header';
 import SearchForm from './components/SearchForm';
 import ExplanationResult from './components/ExplanationResult';
-import SignupBanner from './components/SignupBanner';
 import RecentSearches from './components/RecentSearches';
-import SignupPrompt from './components/SignupPrompt';
+import LocalSearchHistoryComponent from './components/LocalSearchHistory';
 
 export default function SlangDictionaryContainer() {
   const [user, setUser] = useState<SupabaseUser | null>(null);
@@ -25,8 +25,7 @@ export default function SlangDictionaryContainer() {
   const [loading, setLoading] = useState(false);
   const [isFromCache, setIsFromCache] = useState(false);
   const [recentTerms, setRecentTerms] = useState<SearchHistory[]>([]);
-  const [showSignupBanner, setShowSignupBanner] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [localHistory, setLocalHistory] = useState<LocalSearchHistory[]>([]);
 
   useEffect(() => {
     // Check authentication status
@@ -36,6 +35,9 @@ export default function SlangDictionaryContainer() {
       // Load recent search history from database if authenticated
       if (user) {
         getSearchHistory(5).then(setRecentTerms);
+      } else {
+        // Load local search history for unauthenticated users
+        setLocalHistory(getLocalSearchHistory());
       }
     });
 
@@ -46,8 +48,10 @@ export default function SlangDictionaryContainer() {
       setUser(session?.user ?? null);
       if (session?.user) {
         getSearchHistory(5).then(setRecentTerms);
+        setLocalHistory([]); // Clear local history when user logs in
       } else {
         setRecentTerms([]);
+        setLocalHistory(getLocalSearchHistory());
       }
     });
 
@@ -59,11 +63,6 @@ export default function SlangDictionaryContainer() {
 
   const handleSearch = async (term: string = searchTerm) => {
     if (!term.trim()) return;
-
-    // Show signup banner after first search if not authenticated
-    if (!user && !showSignupBanner) {
-      setShowSignupBanner(true);
-    }
 
     try {
       setLoading(true);
@@ -99,6 +98,10 @@ export default function SlangDictionaryContainer() {
       if (user) {
         const history = await getSearchHistory(5);
         setRecentTerms(history);
+      } else {
+        // Add to local history for unauthenticated users
+        addToLocalSearchHistory(term);
+        setLocalHistory(getLocalSearchHistory());
       }
     } catch (error) {
       console.error('Error:', error);
@@ -115,12 +118,9 @@ export default function SlangDictionaryContainer() {
     setRecentTerms([]);
   };
 
-  const handleLogin = () => {
-    setShowAuthModal(true);
-  };
-
-  const handleCloseAuthModal = () => {
-    setShowAuthModal(false);
+  const handleSignup = () => {
+    // Navigate to signup page or open modal - for now just navigate to /signup
+    window.location.href = '/signup';
   };
 
   const handleRecentSearchClick = (term: string) => {
@@ -129,58 +129,46 @@ export default function SlangDictionaryContainer() {
   };
 
   return (
-    <>
-      <div className='min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-indigo-100'>
-        <Header user={user} onLogin={handleLogin} onLogout={handleLogout} />
+    <div className='min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-indigo-100'>
+      <Header user={user} onSignup={handleSignup} onLogout={handleLogout} />
 
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-          {/* Signup Banner for non-authenticated users */}
-          {!user && showSignupBanner && (
-            <SignupBanner
-              onSignup={handleLogin}
-              onDismiss={() => setShowSignupBanner(false)}
+      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+        <div className='grid grid-cols-1 lg:grid-cols-3 gap-8'>
+          {/* Search Section */}
+          <div className='lg:col-span-2 space-y-6'>
+            <SearchForm
+              searchTerm={searchTerm}
+              loading={loading}
+              onSearchTermChange={setSearchTerm}
+              onSearch={() => handleSearch()}
             />
-          )}
 
-          <div className='grid grid-cols-1 lg:grid-cols-3 gap-8'>
-            {/* Search Section */}
-            <div className='lg:col-span-2 space-y-6'>
-              <SearchForm
-                searchTerm={searchTerm}
-                loading={loading}
-                onSearchTermChange={setSearchTerm}
-                onSearch={() => handleSearch()}
+            <ExplanationResult
+              explanation={explanation}
+              isFromCache={isFromCache}
+            />
+          </div>
+
+          {/* Sidebar */}
+          <div className='space-y-6'>
+            {/* Recent Searches - For authenticated users */}
+            {user && recentTerms.length > 0 && (
+              <RecentSearches
+                recentTerms={recentTerms}
+                onSearchClick={handleRecentSearchClick}
               />
+            )}
 
-              <ExplanationResult
-                explanation={explanation}
-                isFromCache={isFromCache}
+            {/* Local Search History - For unauthenticated users */}
+            {!user && localHistory.length > 0 && (
+              <LocalSearchHistoryComponent
+                history={localHistory}
+                onSearchClick={handleRecentSearchClick}
               />
-            </div>
-
-            {/* Sidebar */}
-            <div className='space-y-6'>
-              {/* Recent Searches - Only for authenticated users */}
-              {user && (
-                <RecentSearches
-                  recentTerms={recentTerms}
-                  onSearchClick={handleRecentSearchClick}
-                />
-              )}
-
-              {/* Unauthenticated sidebar info */}
-              {!user && <SignupPrompt onSignup={handleLogin} />}
-            </div>
+            )}
           </div>
         </div>
       </div>
-
-      {/* Auth Modal */}
-      <Dialog open={showAuthModal} onOpenChange={setShowAuthModal}>
-        <DialogContent className='max-w-md p-0 border-0 rounded-2xl'>
-          <AuthModal onClose={handleCloseAuthModal} />
-        </DialogContent>
-      </Dialog>
-    </>
+    </div>
   );
 }
