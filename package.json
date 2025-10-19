@@ -1,0 +1,36 @@
+{
+  "name": "slang-sensei-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Japanese Slang Dictionary with AI-powered explanations",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm -F frontend dev",
+    "build": "pnpm -F frontend build",
+    "preview": "pnpm -F frontend preview",
+    "lint": "pnpm -F frontend lint",
+    "deploy:functions": "supabase functions deploy",
+    "deploy:db": "supabase db push",
+    "deploy:all": "./deploy.sh",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:status": "supabase status",
+    "supabase:logs": "supabase functions logs explain",
+    "supabase:logs:local": "supabase functions logs explain --local",
+    "supabase:test": "curl -X POST 'http://127.0.0.1:54321/functions/v1/explain' -H 'Authorization: Bearer ${SUPABASE_ANON_KEY}' -H 'Content-Type: application/json' -d '{\"term\": \"草\"}'",
+    "export:csv": "pnpm -F scripts export:csv"
+  },
+  "keywords": [
+    "japanese",
+    "slang",
+    "dictionary",
+    "ai",
+    "openai",
+    "supabase"
+  ],
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}

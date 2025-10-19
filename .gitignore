@@ -1,5 +1,9 @@
 node_modules
 
+# pnpm
+pnpm-lock.yaml
+.pnpm-store
+
 # Supabase
 .branches
 .temp
@@ -11,3 +15,6 @@ node_modules
 .env.*.local
 
 csv-export
+
+# Documentation (internal use only, not committed)
+docs/

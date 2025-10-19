@@ -6,7 +6,7 @@ echo "🚀 Starting Slang Sensei deployment process..."
 # Check if Supabase CLI is installed
 if ! command -v supabase &> /dev/null; then
     echo "❌ Supabase CLI not found. Please install it first:"
-    echo "npm install -g supabase"
+    echo "pnpm add -g supabase"
     exit 1
 fi
 
@@ -20,7 +20,7 @@ echo "✅ Supabase CLI is ready"
 
 # Deploy Supabase functions
 echo "📦 Deploying Supabase Edge Functions..."
-supabase functions deploy explain
+supabase functions deploy
 
 if [ $? -eq 0 ]; then
     echo "✅ Edge Functions deployed successfully"

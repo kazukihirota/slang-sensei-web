@@ -71,34 +71,12 @@ async function handleNewSlangTerm(
       );
     }
 
-    // Convert the created data to SlangContext format for explanation generation
-    const newEntry: SlangContext[] = [{
-      id: entryId,
-      headword: data.headword || "",
-      reading: data.reading,
-      pos: data.pos,
-      register: data.register || "casual",
-      dialect: data.dialect,
-      tags: data.tags,
-      definition_ja: data.definition_ja,
-      definition_en: data.definition_en,
-      polite_equiv: data.polite_equiv,
-      notes: data.notes,
-      popularity: 1,
-      entry_type: "slang",
-      created_at: new Date().toISOString(),
-      examples: data.examples?.map((ex) => ex.jp) || [],
-    }];
-
-    // Generate explanation using the same function as existing terms
-    console.log("Generating explanation for new entry:", newEntry[0].headword);
-    const explanation = await generateExplanation(
-      OPENAI_API_KEY,
-      OPENAI_MODEL,
-      term,
-      newEntry,
+    // Use the explanation from the first OpenAI call (no need for a second call)
+    const explanation = data.explanation;
+    console.log(
+      "Using explanation from analysis (single API call):",
+      explanation.substring(0, 50) + "...",
     );
-    console.log("Explanation generated successfully");
 
     // Cache the explanation
     const hash = await generateHash(term, [entryId]);

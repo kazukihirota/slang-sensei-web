@@ -7,12 +7,12 @@ This directory contains scripts for exporting JMdict data to CSV format for Supa
 1. **Install dependencies:**
 
    ```bash
-   npm install
+   pnpm install
    ```
 
 2. **Run the export script:**
    ```bash
-   npm run export:csv
+   pnpm run export:csv
    ```
 
 ## Usage
@@ -21,7 +21,7 @@ This directory contains scripts for exporting JMdict data to CSV format for Supa
 
 ```bash
 # Export all JMdict entries to CSV files
-npm run export:csv
+pnpm run export:csv
 ```
 
 This will:

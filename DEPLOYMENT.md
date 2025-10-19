@@ -17,11 +17,11 @@
 
 ### 1.2 Deploy Database Schema
 
-1. Install Supabase CLI: `npm install -g supabase`
+1. Install Supabase CLI: `pnpm add -g supabase`
 2. Login: `supabase login`
 3. Link your project: `supabase link --project-ref YOUR_PROJECT_REF`
 4. Deploy migrations: `supabase db push`
-5. Deploy Edge Functions: `supabase functions deploy explain`
+5. Deploy Edge Functions: `supabase functions deploy`
 
 ### 1.3 Get Production Credentials
 
@@ -45,8 +45,9 @@ Vercel should auto-detect Vite, but verify:
 
 - **Framework Preset**: Vite
 - **Root Directory**: `frontend`
-- **Build Command**: `npm run build`
+- **Build Command**: `pnpm run build`
 - **Output Directory**: `dist`
+- **Install Command**: `pnpm install`
 
 ### 2.3 Set Environment Variables
 
