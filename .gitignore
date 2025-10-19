@@ -1,7 +1,6 @@
 node_modules
 
 # pnpm
-pnpm-lock.yaml
 .pnpm-store
 
 # Supabase
@@ -18,3 +17,5 @@ csv-export
 
 # Documentation (internal use only, not committed)
 docs/
+
+.vscode/
