@@ -5,7 +5,8 @@ A modern Japanese slang dictionary web application with AI-powered explanations.
 ## 🚀 Features
 
 - **Search Japanese Slang**: Comprehensive database of Japanese slang terms
-- **AI Explanations**: Powered by OpenAI GPT-4o-mini for detailed, context-aware explanations
+- **AI Explanations**: Powered by OpenAI GPT-4o-mini for detailed, context-aware
+  explanations
 - **User Authentication**: Secure sign-up and sign-in with Supabase Auth
 - **Search History**: Track your recent searches
 - **Real-time Updates**: Fast, responsive interface built with React + Vite
@@ -91,6 +92,7 @@ supabase secrets set OPENAI_API_KEY=sk-proj-your-key-here
 ```bash
 # Start Supabase (if not already running)
 supabase start
+supabase functions serve
 
 # In a new terminal, start the frontend
 cd frontend
@@ -186,7 +188,8 @@ slang-sensei-web/
 
 ## 🚀 Deployment
 
-See the [DEPLOYMENT.md](./DEPLOYMENT.md) guide for detailed production deployment instructions.
+See the [DEPLOYMENT.md](./DEPLOYMENT.md) guide for detailed production
+deployment instructions.
 
 Quick deploy:
 
@@ -208,12 +211,15 @@ pnpm deploy:all
 ## 📚 Documentation
 
 - [DEPLOYMENT.md](./DEPLOYMENT.md) - Full production deployment guide
-- [docs/API_FLOW.md](./docs/API_FLOW.md) - API call flow documentation (internal)
-- [docs/DEPLOYING_FUNCTIONS.md](./docs/DEPLOYING_FUNCTIONS.md) - Edge Functions deployment (internal)
+- [docs/API_FLOW.md](./docs/API_FLOW.md) - API call flow documentation
+  (internal)
+- [docs/DEPLOYING_FUNCTIONS.md](./docs/DEPLOYING_FUNCTIONS.md) - Edge Functions
+  deployment (internal)
 - [frontend/README.md](./frontend/README.md) - Frontend-specific docs
 - [scripts/README.md](./scripts/README.md) - Scripts documentation
 
-**Note**: The `docs/` directory is excluded from git and contains internal development documentation.
+**Note**: The `docs/` directory is excluded from git and contains internal
+development documentation.
 
 ## 🧪 Testing
 
@@ -335,18 +341,3 @@ supabase functions logs explain --local
 # Verify OpenAI key is set
 supabase secrets list
 ```
-
-## 📄 License
-
-MIT License - See LICENSE file for details
-
-## 🙏 Acknowledgments
-
-- **JMdict** - Japanese dictionary data
-- **Supabase** - Backend infrastructure
-- **OpenAI** - AI explanations
-- **React** & **Vite** - Frontend framework and tooling
-
----
-
-Built with ❤️ using React, Supabase, and OpenAI

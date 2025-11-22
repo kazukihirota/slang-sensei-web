@@ -19,3 +19,5 @@ csv-export
 docs/
 
 .vscode/
+
+.memo/

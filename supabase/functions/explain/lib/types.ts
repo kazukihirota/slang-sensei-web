@@ -20,16 +20,16 @@ export interface SlangContext {
 
 export interface SlangData {
   headword: string | null;
-  reading?: string;
-  pos?: string;
-  register?: "polite" | "neutral" | "casual" | "vulgar";
-  dialect?: string[];
-  tags?: string[];
+  reading?: string | null;
+  pos?: string | null;
+  register?: "polite" | "neutral" | "casual" | "vulgar" | null;
+  dialect?: string[] | null;
+  tags?: string[] | null;
   definition_ja: string;
   definition_en: string;
-  polite_equiv?: string;
-  notes?: string;
-  examples?: Array<{ jp: string; en: string }>;
+  polite_equiv?: string | null;
+  notes?: string | null;
+  examples?: Array<{ jp: string; en: string }> | null;
   explanation: string;
 }
 

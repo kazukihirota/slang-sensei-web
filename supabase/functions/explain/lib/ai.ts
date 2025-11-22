@@ -1,0 +1,176 @@
+import { createOpenAI } from "@ai-sdk/openai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { generateObject, generateText } from "ai";
+import { z } from "zod";
+import type { SlangContext, SlangData } from "./types.ts";
+import {
+  buildAnalysisPrompt,
+  buildExplanationPrompt,
+  SYSTEM_PROMPT,
+} from "./prompts.ts";
+import {
+  GEMINI_MODELS,
+  GPT_MODELS,
+  type SUPPORTED_GEMINI_MODELS,
+  type SUPPORTED_GPT_MODELS,
+  type SUPPORTED_MODELS,
+} from "./config.ts";
+
+// Type guard functions
+const isGPTModel = (model: SUPPORTED_MODELS): model is SUPPORTED_GPT_MODELS => {
+  return GPT_MODELS.includes(model as SUPPORTED_GPT_MODELS);
+};
+
+const isGeminiModel = (
+  model: SUPPORTED_MODELS,
+): model is SUPPORTED_GEMINI_MODELS => {
+  return GEMINI_MODELS.includes(model as SUPPORTED_GEMINI_MODELS);
+};
+
+// Initialize providers
+const getModel = (modelName: SUPPORTED_MODELS, apiKey: string) => {
+  // Check if it's a GPT model
+  if (isGPTModel(modelName)) {
+    const openai = createOpenAI({
+      apiKey,
+    });
+    return openai(modelName);
+  }
+
+  // Check if it's a Gemini model
+  if (isGeminiModel(modelName)) {
+    const google = createGoogleGenerativeAI({
+      apiKey,
+    });
+    return google(modelName);
+  }
+
+  // If no match, throw an error
+  throw new Error(
+    `Unsupported model: ${modelName}. Supported models are: ${
+      [...GPT_MODELS, ...GEMINI_MODELS].join(", ")
+    }`,
+  );
+};
+
+/**
+ * Generate an explanation for existing slang entries
+ */
+export async function generateExplanation(
+  apiKey: string,
+  model: SUPPORTED_MODELS,
+  context: SlangContext[],
+): Promise<string> {
+  const modelInstance = getModel(model, apiKey);
+
+  const startTime = performance.now();
+  const { text, usage } = await generateText({
+    model: modelInstance,
+    system: SYSTEM_PROMPT,
+    prompt: buildExplanationPrompt(context),
+    temperature: 0.5,
+  });
+  const endTime = performance.now();
+  const duration = endTime - startTime;
+
+  // Log performance metrics
+  console.log(`[Performance] Model: ${model}`);
+  console.log(
+    `[Performance] Duration: ${duration.toFixed(2)}ms (${
+      (duration / 1000).toFixed(2)
+    }s)`,
+  );
+  if (usage) {
+    // Type assertion needed as AI SDK's usage type doesn't expose these properties
+    // but they exist at runtime
+    const usageData = usage as unknown as {
+      promptTokens?: number;
+      completionTokens?: number;
+      totalTokens?: number;
+    };
+    const promptTokens = usageData.promptTokens ?? 0;
+    const completionTokens = usageData.completionTokens ?? 0;
+    const totalTokens = usageData.totalTokens ?? 0;
+    console.log(`[Performance] Prompt tokens: ${promptTokens}`);
+    console.log(`[Performance] Completion tokens: ${completionTokens}`);
+    console.log(`[Performance] Total tokens: ${totalTokens}`);
+    if (completionTokens > 0) {
+      const tokensPerSecond = (completionTokens / (duration / 1000)).toFixed(2);
+      console.log(`[Performance] Speed: ${tokensPerSecond} tokens/sec`);
+    }
+  }
+
+  return text;
+}
+
+/**
+ * Analyze a new slang term and extract structured data
+ */
+export async function analyzeNewSlangTerm(
+  apiKey: string,
+  model: SUPPORTED_MODELS,
+  term: string,
+): Promise<SlangData> {
+  const modelInstance = getModel(model, apiKey);
+  const startTime = performance.now();
+
+  // Define the schema for the slang data
+  const slangSchema = z.object({
+    headword: z.string().nullable(),
+    reading: z.string().nullish(),
+    pos: z.string().nullish(),
+    register: z.enum(["polite", "neutral", "casual", "vulgar"]).nullish(),
+    dialect: z.array(z.string()).nullish(),
+    tags: z.array(z.string()).nullish(),
+    definition_ja: z.string(),
+    definition_en: z.string(),
+    polite_equiv: z.string().nullish(),
+    notes: z.string().nullish(),
+    examples: z.array(
+      z.object({
+        jp: z.string(),
+        en: z.string(),
+      }),
+    ).nullish(),
+    explanation: z.string(),
+  });
+
+  const { object, usage } = await generateObject({
+    model: modelInstance,
+    schema: slangSchema,
+    system: SYSTEM_PROMPT,
+    prompt: buildAnalysisPrompt(term),
+    temperature: 0.3,
+  });
+  const endTime = performance.now();
+  const duration = endTime - startTime;
+
+  // Log performance metrics
+  console.log(`[Performance] Analysis Model: ${model}`);
+  console.log(
+    `[Performance] Duration: ${duration.toFixed(2)}ms (${
+      (duration / 1000).toFixed(2)
+    }s)`,
+  );
+  if (usage) {
+    // Type assertion needed as AI SDK's usage type doesn't expose these properties
+    // but they exist at runtime
+    const usageData = usage as unknown as {
+      promptTokens?: number;
+      completionTokens?: number;
+      totalTokens?: number;
+    };
+    const promptTokens = usageData.promptTokens ?? 0;
+    const completionTokens = usageData.completionTokens ?? 0;
+    const totalTokens = usageData.totalTokens ?? 0;
+    console.log(`[Performance] Prompt tokens: ${promptTokens}`);
+    console.log(`[Performance] Completion tokens: ${completionTokens}`);
+    console.log(`[Performance] Total tokens: ${totalTokens}`);
+    if (completionTokens > 0) {
+      const tokensPerSecond = (completionTokens / (duration / 1000)).toFixed(2);
+      console.log(`[Performance] Speed: ${tokensPerSecond} tokens/sec`);
+    }
+  }
+
+  return object;
+}

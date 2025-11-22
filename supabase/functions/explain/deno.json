@@ -1,6 +1,10 @@
 {
   "imports": {
     "@supabase/supabase-js": "jsr:@supabase/supabase-js@2",
-    "@supabase/functions-js/edge-runtime.d.ts": "jsr:@supabase/functions-js/edge-runtime.d.ts"
+    "@supabase/functions-js/edge-runtime.d.ts": "jsr:@supabase/functions-js/edge-runtime.d.ts",
+    "ai": "npm:ai",
+    "@ai-sdk/openai": "npm:@ai-sdk/openai",
+    "@ai-sdk/google": "npm:@ai-sdk/google",
+    "zod": "npm:zod"
   }
 }
