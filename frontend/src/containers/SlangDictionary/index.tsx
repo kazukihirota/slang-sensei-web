@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   supabase,
-  getSlangExplanationStream,
+  getSlangExplanation,
   getSearchHistory,
   getCachedExplanation,
   setCachedExplanation,
@@ -84,15 +84,12 @@ export default function SlangDictionaryContainer() {
 
       setExplanation(''); // Clear previous explanation
 
-      // Use streaming for real-time updates
-      let fullExplanation = '';
-      await getSlangExplanationStream(term, (chunk) => {
-        fullExplanation += chunk;
-        setExplanation(fullExplanation);
-      });
+      // Get explanation from API
+      const result = await getSlangExplanation(term);
+      setExplanation(result);
 
       // Cache the result for next time
-      setCachedExplanation(term, fullExplanation);
+      setCachedExplanation(term, result);
 
       // Reload recent searches from database after completion (only if authenticated)
       if (user) {
@@ -145,7 +142,6 @@ export default function SlangDictionaryContainer() {
 
             <ExplanationResult
               explanation={explanation}
-              isFromCache={isFromCache}
             />
           </div>
 

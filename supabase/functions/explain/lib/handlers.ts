@@ -22,14 +22,12 @@ export async function handleNewSlangTerm(
   console.log(`Creating new slang entry for "${term}"`);
 
   try {
-    // Get structured data from OpenAI
     const data: SlangData = await analyzeNewSlangTerm(
       apiKey,
       model,
       term,
     );
 
-    // Check if it's a valid term
     if (!data.headword || data.headword === null) {
       return new Response(
         `"${term}" is not recognized as a Japanese slang term. Please try another term.`,
@@ -40,12 +38,8 @@ export async function handleNewSlangTerm(
       );
     }
 
-    // Create the dictionary entry
     const entryId = await createSlangEntry(SUPABASE_URL, SERVICE_ROLE, data);
     console.log("New dictionary entry created with ID:", entryId);
-    console.log("Created entry data:", JSON.stringify(data, null, 2));
-
-    // Create examples if provided
     if (
       data.examples && Array.isArray(data.examples) && data.examples.length > 0
     ) {
@@ -107,7 +101,7 @@ export async function handleNewSlangTerm(
  * Generate explanation for existing slang entries
  */
 export async function handleExistingSlang(
-  ctx: SlangContext[],
+  ctx: SlangContext,
   model: SUPPORTED_MODELS,
   apiKey: string,
 ): Promise<string> {
@@ -119,6 +113,6 @@ export async function handleExistingSlang(
     );
   } catch (error) {
     console.error("Error message:", error);
-    return generateFallbackExplanation(ctx[0]);
+    return generateFallbackExplanation(ctx);
   }
 }

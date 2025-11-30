@@ -33,7 +33,7 @@ export default function SearchForm({
             value={searchTerm}
             onChange={(e) => onSearchTermChange(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder='Enter slang term (e.g., 草, エモい, しか勝たん)'
+            placeholder='Enter slang term'
             className='flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all'
           />
           <button

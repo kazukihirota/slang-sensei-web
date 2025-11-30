@@ -17,26 +17,27 @@ export const EXPLANATION_FORMAT = `**Meaning + Nuance**:
  * System prompt for Japanese slang tutor
  */
 export const SYSTEM_PROMPT =
-  "You are a concise Japanese slang tutor. Keep total under 120 words. JP+EN, register notes.";
+  "You are a concise Japanese slang tutor. Always provide exactly 2 example sentences. Keep total under 120 words.";
 
 /**
  * Builds the user prompt for explaining existing slang entries
  */
 export function buildExplanationPrompt(
-  context: Array<{
+  context: {
     headword: string;
     definition_en: string;
     definition_ja: string;
     examples?: string[];
-  }>,
+  },
 ): string {
-  const contextStr = context.map((c) =>
-    `- ${c.headword}: ${c.definition_en} / ${c.definition_ja}\nExamples: ${
-      c.examples?.slice(0, 2).join(" | ")
-    }`
-  ).join("\n");
+  const contextStr = `${context.headword}: ${context.definition_en}\nExamples: ${
+    context.examples?.slice(0, 2).join(" | ") || "none"
+  }`;
 
-  return `Context:\n${contextStr}\n\nFormat your response EXACTLY like this:\n\n${EXPLANATION_FORMAT}`;
+  return `Context: ${contextStr}\n\nYou MUST follow this exact format with all sections. Always include exactly 2 complete example sentences:\n\n${EXPLANATION_FORMAT}\n\nIMPORTANT:
+- Provide 2 full example sentences (both Japanese and English)
+- Include the "Polite Alternative" section if the term is casual or vulgar
+- If the term is neutral/polite, you can omit the "Polite Alternative" section`;
 }
 
 /**

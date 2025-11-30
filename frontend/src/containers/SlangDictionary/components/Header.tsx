@@ -17,7 +17,7 @@ export default function Header({ user, onSignup, onLogout }: HeaderProps) {
               <Book className='h-5 w-5 text-white' />
             </div>
             <h1 className='text-2xl font-bold text-gray-900'>スラング先生</h1>
-            <span className='text-sm text-gray-500'>Slang Sensei</span>
+            <span className='text-sm text-gray-500 hidden sm:inline'>Slang Sensei</span>
           </div>
 
           <div className='flex items-center space-x-4'>

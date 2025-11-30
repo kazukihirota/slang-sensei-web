@@ -12,15 +12,9 @@ import {
   recordUserSearch,
   searchSlang,
 } from "./lib/database.ts";
-import { generateHash } from "./lib/utils.ts";
+import { generateHash, resolveApiKey } from "./lib/utils.ts";
 import { corsHeaders } from "../_shared/cors.ts";
-import {
-  DEFAULT_MODEL,
-  GOOGLE_GENERATIVE_AI_API_KEY,
-  OPENAI_API_KEY,
-  SERVICE_ROLE,
-  SUPABASE_URL,
-} from "./lib/config.ts";
+import { DEFAULT_MODEL, SERVICE_ROLE, SUPABASE_URL } from "./lib/config.ts";
 import { getAuthenticatedUser } from "./lib/auth.ts";
 import { handleExistingSlang, handleNewSlangTerm } from "./lib/handlers.ts";
 
@@ -49,36 +43,15 @@ export const handler = async (req: Request): Promise<Response> => {
     // 1) Search for slang entries and get user in parallel
     try {
       const [ctx, user] = await Promise.all([
-        searchSlang(SUPABASE_URL, SERVICE_ROLE, term, 3),
+        searchSlang(SUPABASE_URL, SERVICE_ROLE, term, 1),
         getAuthenticatedUser(req),
       ]);
 
       const userId = user?.id || null;
       console.log(`Search results for "${term}":`, ctx.length, "entries found");
 
-      const apiKey = model.toLowerCase().startsWith("gemini")
-        ? GOOGLE_GENERATIVE_AI_API_KEY
-        : OPENAI_API_KEY;
+      const apiKey = resolveApiKey(model);
 
-      if (
-        !apiKey ||
-        apiKey === "sk-test-dummy-key-for-development"
-      ) {
-        console.log("API key not available, returning 404");
-        // If we have context but no API key, we can still return a basic explanation
-        // But if no context, we can't do anything
-        if (!ctx || ctx.length === 0) {
-          return new Response(
-            `No slang entry found for "${term}". Try searching for popular terms like "草", "やばい", or "エモい".`,
-            {
-              status: 404,
-              headers: { ...corsHeaders, "Content-Type": "text/plain" },
-            },
-          );
-        }
-      }
-
-      // If no results found, try to create a new entry using AI
       if (!ctx || ctx.length === 0) {
         console.log("No results found, creating new slang term");
         return await handleNewSlangTerm(term, userId, model, apiKey);
@@ -87,7 +60,7 @@ export const handler = async (req: Request): Promise<Response> => {
       // 2) Check cache
       const hash = await generateHash(
         term,
-        ctx.map((c) => c.id),
+        [ctx[0].id],
       );
 
       const cachedAnswer = await getCachedExplanation(
@@ -117,8 +90,8 @@ export const handler = async (req: Request): Promise<Response> => {
       }
 
       // 3) Generate explanation
-      const entryId = ctx.length > 0 ? ctx[0].id : null;
-      const answer = await handleExistingSlang(ctx, model, apiKey);
+      const entryId = ctx[0].id;
+      const answer = await handleExistingSlang(ctx[0], model, apiKey);
 
       // Cache and record (fire-and-forget)
       cacheExplanation(

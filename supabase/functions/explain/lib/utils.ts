@@ -1,6 +1,12 @@
 // Utility functions
 
 import type { Language } from "./types.ts";
+import {
+  ANTHROPIC_API_KEY,
+  GOOGLE_GENERATIVE_AI_API_KEY,
+  OPENAI_API_KEY,
+  type SUPPORTED_MODELS,
+} from "./config.ts";
 
 /**
  * Generate a hash from search parameters for caching
@@ -18,6 +24,23 @@ export async function generateHash(
   return Array.from(new Uint8Array(hash))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
+}
+
+/**
+ * Resolve the appropriate API key based on the model
+ */
+export function resolveApiKey(model: SUPPORTED_MODELS): string {
+  const modelLower = model.toLowerCase();
+
+  if (modelLower.startsWith("gemini")) {
+    return GOOGLE_GENERATIVE_AI_API_KEY;
+  } else if (modelLower.startsWith("gpt")) {
+    return OPENAI_API_KEY;
+  } else if (modelLower.startsWith("claude")) {
+    return ANTHROPIC_API_KEY;
+  }
+
+  throw new Error(`Unknown model provider for model: ${model}`);
 }
 
 export function detectLanguage(text: string): Language {

@@ -1,13 +1,11 @@
-import { Sparkles, Zap } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 interface ExplanationResultProps {
   explanation: string;
-  isFromCache: boolean;
 }
 
 export default function ExplanationResult({
   explanation,
-  isFromCache,
 }: ExplanationResultProps) {
   if (!explanation) return null;
 
@@ -18,12 +16,6 @@ export default function ExplanationResult({
           <Sparkles className='h-5 w-5 mr-2 text-indigo-600' />
           Explanation
         </div>
-        {isFromCache && (
-          <span className='flex items-center text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full'>
-            <Zap className='h-3 w-3 mr-1' />
-            Instant (Cached)
-          </span>
-        )}
       </h3>
       <div
         className='prose prose-sm max-w-none text-gray-700'
