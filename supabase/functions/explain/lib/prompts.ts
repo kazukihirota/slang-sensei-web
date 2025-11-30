@@ -30,9 +30,10 @@ export function buildExplanationPrompt(
     examples?: string[];
   },
 ): string {
-  const contextStr = `${context.headword}: ${context.definition_en}\nExamples: ${
-    context.examples?.slice(0, 2).join(" | ") || "none"
-  }`;
+  const contextStr =
+    `${context.headword}: ${context.definition_en}\nExamples: ${
+      context.examples?.slice(0, 2).join(" | ") || "none"
+    }`;
 
   return `Context: ${contextStr}\n\nYou MUST follow this exact format with all sections. Always include exactly 2 complete example sentences:\n\n${EXPLANATION_FORMAT}\n\nIMPORTANT:
 - Provide 2 full example sentences (both Japanese and English)
@@ -63,4 +64,41 @@ Respond ONLY with valid JSON (no markdown, no explanation) with these fields:
 }
 
 If this is not a real Japanese slang term, set all fields to null and explanation to "Not a recognized Japanese slang term."`;
+}
+
+/**
+ * System prompt for Japanese grammar analysis
+ */
+export const GRAMMAR_SYSTEM_PROMPT =
+  "You are a Japanese grammar expert. Analyze sentences systematically with pattern identification, word-by-word parsing, and natural translation. Always format responses as structured markdown with tables. Be thorough but concise.";
+
+/**
+ * Builds the user prompt for grammar analysis
+ */
+export function buildGrammarAnalysisPrompt(sentence: string): string {
+  return `Analyze this Japanese sentence: "${sentence}"
+
+You MUST respond in this EXACT markdown format:
+
+## Grammar Pattern Breakdown
+| Pattern | Explanation | Example |
+|---------|-------------|---------|
+| [pattern1] | [clear explanation] | [example] |
+| [pattern2] | [clear explanation] | [example] |
+
+## Word-by-Word Analysis
+| Word | Reading | Part of Speech | Conjugation | Function |
+|------|---------|----------------|-------------|----------|
+| [word1] | [hiragana] | [pos] | [conjugation or -] | [role in sentence] |
+| [word2] | [hiragana] | [pos] | [conjugation or -] | [role in sentence] |
+
+## Translation
+[Natural English translation of the sentence]
+
+CRITICAL REQUIREMENTS:
+- Parse EVERY word including particles
+- Include ALL grammar patterns (conjugations, particles, auxiliaries)
+- Provide complete markdown tables (all 5 columns for word analysis)
+- Be accurate and educational
+- Keep explanations clear and concise`;
 }

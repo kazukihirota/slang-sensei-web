@@ -7,6 +7,8 @@ import type { SlangContext, SlangData } from "./types.ts";
 import {
   buildAnalysisPrompt,
   buildExplanationPrompt,
+  buildGrammarAnalysisPrompt,
+  GRAMMAR_SYSTEM_PROMPT,
   SYSTEM_PROMPT,
 } from "./prompts.ts";
 import {
@@ -201,4 +203,62 @@ export async function analyzeNewSlangTerm(
   }
 
   return object;
+}
+
+/**
+ * Generate grammar analysis for a Japanese sentence
+ */
+export async function generateGrammarAnalysis(
+  apiKey: string,
+  model: SUPPORTED_MODELS,
+  sentence: string,
+): Promise<string> {
+  const modelInstance = getModel(model, apiKey);
+
+  // Create abort controller for timeout (8s for grammar analysis)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const startTime = performance.now();
+    const { text, usage } = await generateText({
+      model: modelInstance,
+      system: GRAMMAR_SYSTEM_PROMPT,
+      prompt: buildGrammarAnalysisPrompt(sentence),
+      temperature: 0.2, // Lower temperature for consistent markdown formatting
+      topP: 0.95,
+      abortSignal: controller.signal,
+    });
+    const endTime = performance.now();
+    const duration = endTime - startTime;
+
+    // Log performance metrics
+    console.log(`[Grammar Analysis] Model: ${model}`);
+    console.log(
+      `[Grammar Analysis] Duration: ${duration.toFixed(2)}ms (${
+        (duration / 1000).toFixed(2)
+      }s)`,
+    );
+    if (usage) {
+      const usageData = usage as unknown as {
+        promptTokens?: number;
+        completionTokens?: number;
+        totalTokens?: number;
+      };
+      const promptTokens = usageData.promptTokens ?? 0;
+      const completionTokens = usageData.completionTokens ?? 0;
+      const totalTokens = usageData.totalTokens ?? 0;
+      console.log(`[Grammar Analysis] Prompt tokens: ${promptTokens}`);
+      console.log(`[Grammar Analysis] Completion tokens: ${completionTokens}`);
+      console.log(`[Grammar Analysis] Total tokens: ${totalTokens}`);
+      if (completionTokens > 0) {
+        const tokensPerSecond = (completionTokens / (duration / 1000)).toFixed(2);
+        console.log(`[Grammar Analysis] Speed: ${tokensPerSecond} tokens/sec`);
+      }
+    }
+
+    return text;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }

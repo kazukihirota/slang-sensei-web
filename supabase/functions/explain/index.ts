@@ -16,7 +16,7 @@ import { generateHash, resolveApiKey } from "./lib/utils.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { DEFAULT_MODEL, SERVICE_ROLE, SUPABASE_URL } from "./lib/config.ts";
 import { getAuthenticatedUser } from "./lib/auth.ts";
-import { handleExistingSlang, handleNewSlangTerm } from "./lib/handlers.ts";
+import { handleExistingSlang, handleGrammarAnalysis, handleNewSlangTerm } from "./lib/handlers.ts";
 
 /**
  * Main request handler
@@ -29,28 +29,40 @@ export const handler = async (req: Request): Promise<Response> => {
 
   try {
     // Parse request
-    const { term } = await req.json();
-    if (!term || typeof term !== "string") {
-      return new Response(JSON.stringify({ error: "Missing 'term'" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
-      });
+    const body = await req.json();
+    const { term, sentence, type = 'slang' } = body;
+
+    // Determine input text based on type
+    const inputText = type === 'grammar' ? sentence : term;
+
+    if (!inputText || typeof inputText !== "string") {
+      return new Response(
+        JSON.stringify({ error: 'Missing required input' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
     }
 
     // Always use the default model
     const model = DEFAULT_MODEL;
+    const apiKey = resolveApiKey(model);
 
-    // 1) Search for slang entries and get user in parallel
+    // Get authenticated user
+    const user = await getAuthenticatedUser(req);
+    const userId = user?.id || null;
+
+    // Route to grammar analysis if type is 'grammar'
+    if (type === 'grammar') {
+      return await handleGrammarAnalysis(sentence, userId, model, apiKey);
+    }
+
+    // 1) Search for slang entries
     try {
-      const [ctx, user] = await Promise.all([
-        searchSlang(SUPABASE_URL, SERVICE_ROLE, term, 1),
-        getAuthenticatedUser(req),
-      ]);
+      const ctx = await searchSlang(SUPABASE_URL, SERVICE_ROLE, term, 1);
 
-      const userId = user?.id || null;
       console.log(`Search results for "${term}":`, ctx.length, "entries found");
-
-      const apiKey = resolveApiKey(model);
 
       if (!ctx || ctx.length === 0) {
         console.log("No results found, creating new slang term");

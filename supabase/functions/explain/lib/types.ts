@@ -39,3 +39,19 @@ export interface CreateSlangRequest {
 }
 
 export type Language = "Japanese" | "English";
+
+// Analysis types for slang vs grammar
+export type AnalysisType = 'slang' | 'grammar';
+
+// Request types for different analysis modes
+export interface GrammarAnalysisRequest {
+  sentence: string;
+  type: 'grammar';
+}
+
+export interface SlangRequest {
+  term: string;
+  type?: 'slang';
+}
+
+export type AnalysisRequest = GrammarAnalysisRequest | SlangRequest;

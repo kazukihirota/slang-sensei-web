@@ -49,6 +49,18 @@ export interface SearchHistory {
     created_at: string;
 }
 
+export interface GrammarHistory {
+    id: string;
+    user_id: string;
+    search_term: string;
+    created_at: string;
+}
+
+export interface LocalGrammarHistory {
+    sentence: string;
+    timestamp: number;
+}
+
 // Cache management for optimistic UI
 const CACHE_KEY_PREFIX = "slang_cache_";
 const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -116,6 +128,11 @@ export function clearExpiredCache(): void {
 // Local search history for unauthenticated users
 const LOCAL_HISTORY_KEY = "slang_local_history";
 const MAX_LOCAL_HISTORY = 10;
+
+// Grammar analysis local storage keys
+const LOCAL_GRAMMAR_HISTORY_KEY = 'grammar_local_history';
+const GRAMMAR_CACHE_KEY_PREFIX = 'grammar_cache_';
+const MAX_LOCAL_GRAMMAR_HISTORY = 10;
 
 export interface LocalSearchHistory {
     term: string;
@@ -276,6 +293,108 @@ export async function getSearchHistory(
 
     if (error) {
         console.error("Error fetching search history:", error);
+        return [];
+    }
+
+    return data || [];
+}
+
+// Grammar analysis localStorage functions
+export function getLocalGrammarHistory(): LocalGrammarHistory[] {
+    try {
+        const history = localStorage.getItem(LOCAL_GRAMMAR_HISTORY_KEY);
+        if (!history) return [];
+        return JSON.parse(history);
+    } catch {
+        return [];
+    }
+}
+
+export function addToLocalGrammarHistory(sentence: string): void {
+    try {
+        const history = getLocalGrammarHistory();
+        const filtered = history.filter((item) => item.sentence !== sentence);
+        const updated = [
+            { sentence, timestamp: Date.now() },
+            ...filtered
+        ].slice(0, MAX_LOCAL_GRAMMAR_HISTORY);
+        localStorage.setItem(LOCAL_GRAMMAR_HISTORY_KEY, JSON.stringify(updated));
+    } catch (error) {
+        console.warn('Failed to save to local grammar history:', error);
+    }
+}
+
+export function getCachedGrammarAnalysis(sentence: string): string | null {
+    try {
+        const cached = localStorage.getItem(GRAMMAR_CACHE_KEY_PREFIX + sentence);
+        if (!cached) return null;
+
+        const data: CachedExplanation = JSON.parse(cached);
+
+        if (Date.now() - data.timestamp > CACHE_EXPIRY_MS) {
+            localStorage.removeItem(GRAMMAR_CACHE_KEY_PREFIX + sentence);
+            return null;
+        }
+
+        return data.explanation;
+    } catch {
+        return null;
+    }
+}
+
+export function setCachedGrammarAnalysis(sentence: string, analysis: string): void {
+    try {
+        const data: CachedExplanation = {
+            term: sentence,
+            explanation: analysis,
+            timestamp: Date.now(),
+        };
+        localStorage.setItem(GRAMMAR_CACHE_KEY_PREFIX + sentence, JSON.stringify(data));
+    } catch (error) {
+        console.warn('Failed to cache grammar analysis:', error);
+    }
+}
+
+// Grammar analysis API function
+export async function getGrammarAnalysis(sentence: string): Promise<string> {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+    };
+
+    if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/explain`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sentence, type: 'grammar' }),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to analyze grammar: ${response.statusText}`);
+    }
+
+    return await response.text();
+}
+
+// Get grammar history from database
+export async function getGrammarHistory(limit: number = 20): Promise<GrammarHistory[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase
+        .from('search_history')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('search_type', 'grammar')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+    if (error) {
+        console.error('Error fetching grammar history:', error);
         return [];
     }
 

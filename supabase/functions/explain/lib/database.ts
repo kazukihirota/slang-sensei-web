@@ -1,6 +1,6 @@
 // Database operations
 
-import type { SlangContext, SlangData } from "./types.ts";
+import type { AnalysisType, SlangContext, SlangData } from "./types.ts";
 
 /**
  * Search for dictionary entries in the database
@@ -51,9 +51,10 @@ export async function getCachedExplanation(
   supabaseUrl: string,
   serviceRole: string,
   hash: string,
+  analysisType: AnalysisType = "slang",
 ): Promise<string | null> {
   const cacheRes = await fetch(
-    `${supabaseUrl}/rest/v1/explanation_cache?hash=eq.${hash}&select=answer_md`,
+    `${supabaseUrl}/rest/v1/explanation_cache?hash=eq.${hash}&analysis_type=eq.${analysisType}&select=answer_md`,
     {
       headers: {
         apikey: serviceRole,
@@ -151,6 +152,7 @@ export async function cacheExplanation(
   entryId: string | null,
   hash: string,
   explanation: string,
+  analysisType: AnalysisType = "slang",
 ): Promise<void> {
   await fetch(`${supabaseUrl}/rest/v1/explanation_cache`, {
     method: "POST",
@@ -164,6 +166,7 @@ export async function cacheExplanation(
       entry_id: entryId,
       hash,
       answer_md: explanation,
+      analysis_type: analysisType,
     }),
   });
 }
@@ -177,6 +180,7 @@ export async function recordUserSearch(
   userId: string,
   searchTerm: string,
   entryId: string | null,
+  searchType: AnalysisType = "slang",
 ): Promise<void> {
   try {
     await fetch(`${supabaseUrl}/rest/v1/search_history`, {
@@ -190,6 +194,7 @@ export async function recordUserSearch(
         user_id: userId,
         search_term: searchTerm,
         entry_id: entryId,
+        search_type: searchType,
       }),
     });
   } catch (error) {
