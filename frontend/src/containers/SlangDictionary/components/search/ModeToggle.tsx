@@ -1,5 +1,5 @@
 import { Sparkles, FileText } from 'lucide-react';
-import type { InputMode } from '../type';
+import type { InputMode } from '../../type';
 
 interface ModeToggleProps {
   mode: InputMode;

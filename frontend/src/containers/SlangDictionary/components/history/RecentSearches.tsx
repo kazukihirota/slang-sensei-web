@@ -1,4 +1,4 @@
-import type { SearchHistory } from '../../../lib/supabase';
+import type { SearchHistory } from 'src/lib/supabase';
 
 interface RecentSearchesProps {
   recentTerms: SearchHistory[];

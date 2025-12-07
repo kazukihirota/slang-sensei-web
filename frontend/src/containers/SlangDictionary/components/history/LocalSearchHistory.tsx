@@ -1,5 +1,5 @@
 import { Clock, Info } from 'lucide-react';
-import type { LocalSearchHistory } from '../../../lib/supabase';
+import type { LocalSearchHistory } from 'src/lib/supabase';
 
 interface LocalSearchHistoryProps {
   history: LocalSearchHistory[];

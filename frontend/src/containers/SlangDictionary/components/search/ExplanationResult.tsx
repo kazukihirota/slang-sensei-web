@@ -1,7 +1,7 @@
 import { Sparkles, FileText } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { InputMode } from '../type';
+import type { InputMode } from '../../type';
 
 interface ExplanationResultProps {
   explanation: string;
