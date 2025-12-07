@@ -20,14 +20,14 @@ import {
   type LocalGrammarHistory as LocalGrammarHistoryType,
 } from '../../lib/supabase';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
-import Header from './components/Header';
-import ModeToggle from './components/ModeToggle';
-import SearchForm from './components/SearchForm';
-import ExplanationResult from './components/ExplanationResult';
-import RecentSearches from './components/RecentSearches';
-import LocalSearchHistoryComponent from './components/LocalSearchHistory';
-import GrammarHistoryComponent from './components/GrammarHistory';
-import LocalGrammarHistoryComponent from './components/LocalGrammarHistory';
+import Header from './components/layout/Header';
+import ModeToggle from './components/search/ModeToggle';
+import SearchForm from './components/search/SearchForm';
+import ExplanationResult from './components/search/ExplanationResult';
+import RecentSearches from './components/history/RecentSearches';
+import LocalSearchHistoryComponent from './components/history/LocalSearchHistory';
+import GrammarHistoryComponent from './components/history/GrammarHistory';
+import LocalGrammarHistoryComponent from './components/history/LocalGrammarHistory';
 import type { InputMode } from './type';
 
 export default function SlangDictionaryContainer() {

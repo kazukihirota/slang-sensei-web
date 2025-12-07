@@ -90,7 +90,7 @@ export default function SearchForm({
       </h2>
 
       <div className='space-y-4'>
-        <div className='flex gap-3'>
+        <div className='flex flex-col sm:flex-row gap-3'>
           <div className='relative flex-1'>
             <Input
               type='text'

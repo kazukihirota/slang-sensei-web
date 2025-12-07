@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import AuthHeader from './components/AuthHeader';
 import AuthForm from './components/AuthForm';
-import SuccessMessage from './components/SuccessMessage';
+import OtpVerification from './components/OtpVerification';
 import DevNotice from './components/DevNotice';
 
 export default function AuthContainer() {
@@ -11,7 +11,7 @@ export default function AuthContainer() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
 
   useEffect(() => {
     // Check if user is already authenticated and redirect
@@ -30,14 +30,32 @@ export default function AuthContainer() {
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-        },
       });
       if (error) throw error;
-      setSuccess(true);
+      setOtpSent(true);
     } catch (err: any) {
       setError(err.message || 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (otp: string) => {
+    setError(null);
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token: otp,
+        type: 'email',
+      });
+      if (error) throw error;
+      // Success! User is now authenticated, redirect to home
+      navigate('/');
+    } catch (err: any) {
+      setError(err.message || 'Invalid code. Please try again.');
+      throw err; // Re-throw to let OtpVerification component handle it
     } finally {
       setLoading(false);
     }
@@ -54,11 +72,17 @@ export default function AuthContainer() {
 
         {/* Auth Card */}
         <div className='bg-white rounded-2xl shadow-xl border border-gray-100 p-8'>
-          {success ? (
-            <SuccessMessage
+          {otpSent ? (
+            <OtpVerification
               email={email}
-              onUseDifferentEmail={() => setSuccess(false)}
-              onBackToApp={handleBackToApp}
+              loading={loading}
+              error={error}
+              onVerify={handleVerifyOtp}
+              onUseDifferentEmail={() => {
+                setOtpSent(false);
+                setError(null);
+              }}
+              onResend={handleSubmit}
             />
           ) : (
             <AuthForm
@@ -83,3 +107,4 @@ export default function AuthContainer() {
     </div>
   );
 }
+

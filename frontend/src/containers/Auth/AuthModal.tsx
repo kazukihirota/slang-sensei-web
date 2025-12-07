@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { BookOpen } from 'lucide-react';
 import AuthForm from './components/AuthForm';
-import SuccessMessage from './components/SuccessMessage';
+import OtpVerification from './components/OtpVerification';
 import DevNotice from './components/DevNotice';
 
 interface AuthModalProps {
@@ -13,7 +13,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,14 +23,32 @@ export default function AuthModal({ onClose }: AuthModalProps) {
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-        },
       });
       if (error) throw error;
-      setSuccess(true);
+      setOtpSent(true);
     } catch (err: any) {
       setError(err.message || 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (otp: string) => {
+    setError(null);
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token: otp,
+        type: 'email',
+      });
+      if (error) throw error;
+      // Success! User is now authenticated
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Invalid code. Please try again.');
+      throw err; // Re-throw to let OtpVerification component handle it
     } finally {
       setLoading(false);
     }
@@ -50,11 +68,17 @@ export default function AuthModal({ onClose }: AuthModalProps) {
       </div>
 
       {/* Auth Content */}
-      {success ? (
-        <SuccessMessage
+      {otpSent ? (
+        <OtpVerification
           email={email}
-          onUseDifferentEmail={() => setSuccess(false)}
-          onBackToApp={onClose}
+          loading={loading}
+          error={error}
+          onVerify={handleVerifyOtp}
+          onUseDifferentEmail={() => {
+            setOtpSent(false);
+            setError(null);
+          }}
+          onResend={handleSubmit}
         />
       ) : (
         <AuthForm

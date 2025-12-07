@@ -19,14 +19,18 @@ export default function ModeToggle({ mode, onModeChange }: ModeToggleProps) {
           className={`${baseClasses} ${mode === 'slang' ? activeClasses : inactiveClasses}`}
         >
           <Sparkles className="h-4 w-4" />
-          <span>Slang Lookup</span>
+          <span>Slang 
+            <span className="hidden sm:inline">{` `}Lookup</span>
+          </span>
         </button>
         <button
           onClick={() => onModeChange('grammar')}
           className={`${baseClasses} ${mode === 'grammar' ? activeClasses : inactiveClasses}`}
         >
           <FileText className="h-4 w-4" />
-          <span>Grammar Analysis</span>
+          <span>Grammar 
+            <span className="hidden sm:inline">{` `}Analysis</span>
+          </span>
         </button>
       </div>
     </div>

@@ -61,12 +61,12 @@ export default function AuthForm({
           {loading ? (
             <span className='flex items-center justify-center'>
               <div className='animate-spin -ml-1 mr-3 h-5 w-5 border-2 border-white border-t-transparent rounded-full'></div>
-              Sending magic link...
+              Sending code...
             </span>
           ) : (
             <span className='flex items-center justify-center'>
               <Sparkles className='w-5 h-5 mr-2' />
-              Send Magic Link
+              Send Verification Code
             </span>
           )}
         </button>
@@ -79,10 +79,11 @@ export default function AuthForm({
             🔐 <span className='font-medium'>Passwordless authentication</span>
           </p>
           <p className='text-gray-500 text-xs'>
-            We'll email you a secure link to sign in
+            We'll email you a 6-digit code to sign in
           </p>
         </div>
       </div>
     </>
   );
 }
+
