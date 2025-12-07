@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   supabase,
   getSlangExplanation,
@@ -14,7 +14,7 @@ import {
   setCachedGrammarAnalysis,
   getLocalGrammarHistory,
   addToLocalGrammarHistory,
-  type SearchHistory,
+  type SearchHistory as SearchHistoryType,
   type LocalSearchHistory,
   type GrammarHistory,
   type LocalGrammarHistory as LocalGrammarHistoryType,
@@ -24,11 +24,9 @@ import Header from './components/layout/Header';
 import ModeToggle from './components/search/ModeToggle';
 import SearchForm from './components/search/SearchForm';
 import ExplanationResult from './components/search/ExplanationResult';
-import RecentSearches from './components/history/RecentSearches';
-import LocalSearchHistoryComponent from './components/history/LocalSearchHistory';
-import GrammarHistoryComponent from './components/history/GrammarHistory';
-import LocalGrammarHistoryComponent from './components/history/LocalGrammarHistory';
+import SearchHistory, { type HistoryItem } from './components/history/SearchHistory';
 import type { InputMode } from './type';
+
 
 export default function SlangDictionaryContainer() {
   const [user, setUser] = useState<SupabaseUser | null>(null);
@@ -36,10 +34,41 @@ export default function SlangDictionaryContainer() {
   const [searchTerm, setSearchTerm] = useState('');
   const [explanation, setExplanation] = useState('');
   const [loading, setLoading] = useState(false);
-  const [recentTerms, setRecentTerms] = useState<SearchHistory[]>([]);
+  const [recentTerms, setRecentTerms] = useState<SearchHistoryType[]>([]);
   const [localHistory, setLocalHistory] = useState<LocalSearchHistory[]>([]);
   const [grammarHistory, setGrammarHistory] = useState<GrammarHistory[]>([]);
   const [localGrammarHistory, setLocalGrammarHistory] = useState<LocalGrammarHistoryType[]>([]);
+
+  // Transform history data to unified HistoryItem format
+  const historyItems: HistoryItem[] = useMemo(() => {
+    if (mode === 'slang') {
+      if (user) {
+        return recentTerms.map(item => ({
+          id: item.id,
+          term: item.search_term,
+          createdAt: item.created_at,
+        }));
+      } else {
+        return localHistory.map(item => ({
+          term: item.term,
+          timestamp: item.timestamp,
+        }));
+      }
+    } else {
+      if (user) {
+        return grammarHistory.map(item => ({
+          id: item.id,
+          term: item.search_term,
+          createdAt: item.created_at,
+        }));
+      } else {
+        return localGrammarHistory.map(item => ({
+          term: item.sentence,
+          timestamp: item.timestamp,
+        }));
+      }
+    }
+  }, [mode, user, recentTerms, localHistory, grammarHistory, localGrammarHistory]);
 
   useEffect(() => {
     // Check authentication status
@@ -82,7 +111,7 @@ export default function SlangDictionaryContainer() {
   }, []);
 
   const handleSearch = async (term: string = searchTerm) => {
-    if (!term.trim()) return;
+    if (!term.trim() || loading) return;
 
     try {
       setLoading(true);
@@ -239,37 +268,12 @@ export default function SlangDictionaryContainer() {
 
           {/* Sidebar */}
           <div className='space-y-6'>
-            {/* Slang History - Authenticated */}
-            {mode === 'slang' && user && recentTerms.length > 0 && (
-              <RecentSearches
-                recentTerms={recentTerms}
-                onSearchClick={handleRecentSearchClick}
-              />
-            )}
-
-            {/* Grammar History - Authenticated */}
-            {mode === 'grammar' && user && grammarHistory.length > 0 && (
-              <GrammarHistoryComponent
-                history={grammarHistory}
-                onSearchClick={handleGrammarHistoryClick}
-              />
-            )}
-
-            {/* Slang History - Guest */}
-            {mode === 'slang' && !user && localHistory.length > 0 && (
-              <LocalSearchHistoryComponent
-                history={localHistory}
-                onSearchClick={handleRecentSearchClick}
-              />
-            )}
-
-            {/* Grammar History - Guest */}
-            {mode === 'grammar' && !user && localGrammarHistory.length > 0 && (
-              <LocalGrammarHistoryComponent
-                history={localGrammarHistory}
-                onSearchClick={handleGrammarHistoryClick}
-              />
-            )}
+            <SearchHistory
+              history={historyItems}
+              onSearchClick={mode === 'grammar' ? handleGrammarHistoryClick : handleRecentSearchClick}
+              mode={mode}
+              isLocal={!user}
+            />
           </div>
         </div>
       </div>

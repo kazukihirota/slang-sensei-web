@@ -20,13 +20,25 @@ export default function SearchForm({
   onSearch,
 }: SearchFormProps) {
   const [isDictating, setIsDictating] = useState(false);
+  const [micError, setMicError] = useState<string | null>(null);
   
   const {
     transcript,
     listening,
     resetTranscript,
-    browserSupportsSpeechRecognition
+    browserSupportsSpeechRecognition,
+    isMicrophoneAvailable
   } = useSpeechRecognition();
+
+  // Log speech recognition state changes for debugging
+  useEffect(() => {
+    console.log('[SpeechRecognition] State:', {
+      listening,
+      browserSupportsSpeechRecognition,
+      isMicrophoneAvailable,
+      transcript
+    });
+  }, [listening, browserSupportsSpeechRecognition, isMicrophoneAvailable, transcript]);
 
   // Update search term when transcript changes
   useEffect(() => {
@@ -46,24 +58,43 @@ export default function SearchForm({
     }
   };
 
-  const handleMicClick = () => {
+  const handleMicClick = async () => {
+    setMicError(null);
+    
     if (!browserSupportsSpeechRecognition) {
-      alert('Your browser does not support speech recognition. Please use Chrome or Edge.');
+      const error = 'Your browser does not support speech recognition. Please use Chrome or Edge.';
+      setMicError(error);
+      alert(error);
+      return;
+    }
+
+    if (!isMicrophoneAvailable) {
+      const error = 'Microphone access denied. Please allow microphone access in your browser settings.';
+      setMicError(error);
+      console.error('[SpeechRecognition] Microphone not available');
+      alert(error);
       return;
     }
 
     if (listening) {
       // Stop dictation
       SpeechRecognition.stopListening();
-      console.log('Stopping dictation...');
+      console.log('[SpeechRecognition] Stopping dictation...');
     } else {
       // Start dictation with Japanese language
-      resetTranscript();
-      SpeechRecognition.startListening({ 
-        language: 'ja-JP',
-        continuous: false 
-      });
-      console.log('Starting dictation...');
+      try {
+        resetTranscript();
+        console.log('[SpeechRecognition] Starting dictation...');
+        await SpeechRecognition.startListening({ 
+          language: 'ja-JP',
+          continuous: false 
+        });
+        console.log('[SpeechRecognition] startListening called successfully');
+      } catch (error) {
+        console.error('[SpeechRecognition] Error starting:', error);
+        setMicError(error instanceof Error ? error.message : 'Failed to start speech recognition');
+        alert(`Speech recognition error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   };
 
@@ -88,6 +119,12 @@ export default function SearchForm({
         <Search className='h-5 w-5 mr-2 text-indigo-600' />
         {config.title}
       </h2>
+
+      {micError && (
+        <div className='mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm'>
+          {micError}
+        </div>
+      )}
 
       <div className='space-y-4'>
         <div className='flex flex-col sm:flex-row gap-3'>

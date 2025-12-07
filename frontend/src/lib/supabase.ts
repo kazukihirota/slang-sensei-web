@@ -290,6 +290,7 @@ export async function getSearchHistory(
         .from("search_history")
         .select("*")
         .eq("user_id", user.id)
+        .eq("search_type", "slang")
         .order("created_at", { ascending: false })
         .limit(limit);
 
