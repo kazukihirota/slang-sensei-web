@@ -28,10 +28,11 @@ import RecentSearches from './components/RecentSearches';
 import LocalSearchHistoryComponent from './components/LocalSearchHistory';
 import GrammarHistoryComponent from './components/GrammarHistory';
 import LocalGrammarHistoryComponent from './components/LocalGrammarHistory';
+import type { InputMode } from './type';
 
 export default function SlangDictionaryContainer() {
   const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [mode, setMode] = useState<'slang' | 'grammar'>('slang');
+  const [mode, setMode] = useState<InputMode>('slang');
   const [searchTerm, setSearchTerm] = useState('');
   const [explanation, setExplanation] = useState('');
   const [loading, setLoading] = useState(false);
@@ -128,7 +129,7 @@ export default function SlangDictionaryContainer() {
   };
 
   // Handle mode change
-  const handleModeChange = (newMode: 'slang' | 'grammar') => {
+  const handleModeChange = (newMode: InputMode) => {
     setMode(newMode);
     setSearchTerm('');
     setExplanation('');

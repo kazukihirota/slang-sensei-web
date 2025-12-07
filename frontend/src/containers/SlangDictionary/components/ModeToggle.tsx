@@ -1,12 +1,13 @@
 import { Sparkles, FileText } from 'lucide-react';
+import type { InputMode } from '../type';
 
 interface ModeToggleProps {
-  mode: 'slang' | 'grammar';
-  onModeChange: (mode: 'slang' | 'grammar') => void;
+  mode: InputMode;
+  onModeChange: (mode: InputMode) => void;
 }
 
 export default function ModeToggle({ mode, onModeChange }: ModeToggleProps) {
-  const baseClasses = "flex-1 flex items-center justify-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-all";
+  const baseClasses = "flex-1 flex items-center justify-center space-x-2 px-6 py-2 rounded-lg font-semibold transition-all";
   const activeClasses = "bg-gradient-to-r from-indigo-500 to-indigo-700 text-white shadow-md";
   const inactiveClasses = "bg-white text-gray-600 hover:bg-gray-50 hover:text-indigo-600";
 

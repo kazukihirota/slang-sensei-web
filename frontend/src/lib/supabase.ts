@@ -130,8 +130,8 @@ const LOCAL_HISTORY_KEY = "slang_local_history";
 const MAX_LOCAL_HISTORY = 10;
 
 // Grammar analysis local storage keys
-const LOCAL_GRAMMAR_HISTORY_KEY = 'grammar_local_history';
-const GRAMMAR_CACHE_KEY_PREFIX = 'grammar_cache_';
+const LOCAL_GRAMMAR_HISTORY_KEY = "grammar_local_history";
+const GRAMMAR_CACHE_KEY_PREFIX = "grammar_cache_";
 const MAX_LOCAL_GRAMMAR_HISTORY = 10;
 
 export interface LocalSearchHistory {
@@ -179,16 +179,18 @@ export async function getSlangExplanation(
 ): Promise<string> {
     const { data: { session } } = await supabase.auth.getSession();
 
-    if (!session) {
-        throw new Error("Please sign in to get explanations");
+    // Build headers - include auth token if available
+    const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+    };
+
+    if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
     }
 
     const response = await fetch(`${supabaseUrl}/functions/v1/explain`, {
         method: "POST",
-        headers: {
-            "Authorization": `Bearer ${session.access_token}`,
-            "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({ term, stream: false }),
     });
 
@@ -316,17 +318,22 @@ export function addToLocalGrammarHistory(sentence: string): void {
         const filtered = history.filter((item) => item.sentence !== sentence);
         const updated = [
             { sentence, timestamp: Date.now() },
-            ...filtered
+            ...filtered,
         ].slice(0, MAX_LOCAL_GRAMMAR_HISTORY);
-        localStorage.setItem(LOCAL_GRAMMAR_HISTORY_KEY, JSON.stringify(updated));
+        localStorage.setItem(
+            LOCAL_GRAMMAR_HISTORY_KEY,
+            JSON.stringify(updated),
+        );
     } catch (error) {
-        console.warn('Failed to save to local grammar history:', error);
+        console.warn("Failed to save to local grammar history:", error);
     }
 }
 
 export function getCachedGrammarAnalysis(sentence: string): string | null {
     try {
-        const cached = localStorage.getItem(GRAMMAR_CACHE_KEY_PREFIX + sentence);
+        const cached = localStorage.getItem(
+            GRAMMAR_CACHE_KEY_PREFIX + sentence,
+        );
         if (!cached) return null;
 
         const data: CachedExplanation = JSON.parse(cached);
@@ -342,16 +349,22 @@ export function getCachedGrammarAnalysis(sentence: string): string | null {
     }
 }
 
-export function setCachedGrammarAnalysis(sentence: string, analysis: string): void {
+export function setCachedGrammarAnalysis(
+    sentence: string,
+    analysis: string,
+): void {
     try {
         const data: CachedExplanation = {
             term: sentence,
             explanation: analysis,
             timestamp: Date.now(),
         };
-        localStorage.setItem(GRAMMAR_CACHE_KEY_PREFIX + sentence, JSON.stringify(data));
+        localStorage.setItem(
+            GRAMMAR_CACHE_KEY_PREFIX + sentence,
+            JSON.stringify(data),
+        );
     } catch (error) {
-        console.warn('Failed to cache grammar analysis:', error);
+        console.warn("Failed to cache grammar analysis:", error);
     }
 }
 
@@ -360,17 +373,17 @@ export async function getGrammarAnalysis(sentence: string): Promise<string> {
     const { data: { session } } = await supabase.auth.getSession();
 
     const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
     };
 
     if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
+        headers["Authorization"] = `Bearer ${session.access_token}`;
     }
 
     const response = await fetch(`${supabaseUrl}/functions/v1/explain`, {
-        method: 'POST',
+        method: "POST",
         headers,
-        body: JSON.stringify({ sentence, type: 'grammar' }),
+        body: JSON.stringify({ sentence, type: "grammar" }),
     });
 
     if (!response.ok) {
@@ -381,20 +394,22 @@ export async function getGrammarAnalysis(sentence: string): Promise<string> {
 }
 
 // Get grammar history from database
-export async function getGrammarHistory(limit: number = 20): Promise<GrammarHistory[]> {
+export async function getGrammarHistory(
+    limit: number = 20,
+): Promise<GrammarHistory[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
 
     const { data, error } = await supabase
-        .from('search_history')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('search_type', 'grammar')
-        .order('created_at', { ascending: false })
+        .from("search_history")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("search_type", "grammar")
+        .order("created_at", { ascending: false })
         .limit(limit);
 
     if (error) {
-        console.error('Error fetching grammar history:', error);
+        console.error("Error fetching grammar history:", error);
         return [];
     }
 
