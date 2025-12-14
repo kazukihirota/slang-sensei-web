@@ -6,6 +6,7 @@
     "@ai-sdk/openai": "npm:@ai-sdk/openai",
     "@ai-sdk/google": "npm:@ai-sdk/google",
     "@ai-sdk/anthropic": "npm:@ai-sdk/anthropic",
+    "@openrouter/sdk": "npm:@openrouter/sdk",
     "zod": "npm:zod"
   }
 }

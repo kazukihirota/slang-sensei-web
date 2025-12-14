@@ -13,9 +13,11 @@ import {
 } from "./prompts.ts";
 import {
   ANTHROPIC_MODELS,
+  CEREBRAS_MODELS,
   GEMINI_MODELS,
   GPT_MODELS,
   type SUPPORTED_ANTHROPIC_MODELS,
+  type SUPPORTED_CEREBRAS_MODELS,
   type SUPPORTED_GEMINI_MODELS,
   type SUPPORTED_GPT_MODELS,
   type SUPPORTED_MODELS,
@@ -36,6 +38,12 @@ const isAnthropicModel = (
   model: SUPPORTED_MODELS,
 ): model is SUPPORTED_ANTHROPIC_MODELS => {
   return ANTHROPIC_MODELS.includes(model as SUPPORTED_ANTHROPIC_MODELS);
+};
+
+const isCerebrasModel = (
+  model: SUPPORTED_MODELS,
+): model is SUPPORTED_CEREBRAS_MODELS => {
+  return CEREBRAS_MODELS.includes(model as SUPPORTED_CEREBRAS_MODELS);
 };
 
 // Initialize providers
@@ -64,10 +72,19 @@ const getModel = (modelName: SUPPORTED_MODELS, apiKey: string) => {
     return anthropic(modelName);
   }
 
+  // Check if it's a Cerebras model (via OpenRouter)
+  if (isCerebrasModel(modelName)) {
+    const openrouter = createOpenAI({
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey,
+    });
+    return openrouter(modelName);
+  }
+
   // If no match, throw an error
   throw new Error(
     `Unsupported model: ${modelName}. Supported models are: ${
-      [...GPT_MODELS, ...GEMINI_MODELS, ...ANTHROPIC_MODELS].join(", ")
+      [...GPT_MODELS, ...GEMINI_MODELS, ...ANTHROPIC_MODELS, ...CEREBRAS_MODELS].join(", ")
     }`,
   );
 };

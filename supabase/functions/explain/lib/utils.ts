@@ -5,6 +5,7 @@ import {
   ANTHROPIC_API_KEY,
   GOOGLE_GENERATIVE_AI_API_KEY,
   OPENAI_API_KEY,
+  OPENROUTER_API_KEY,
   type SUPPORTED_MODELS,
 } from "./config.ts";
 
@@ -38,6 +39,8 @@ export function resolveApiKey(model: SUPPORTED_MODELS): string {
     return OPENAI_API_KEY;
   } else if (modelLower.startsWith("claude")) {
     return ANTHROPIC_API_KEY;
+  } else if (modelLower.startsWith("cerebras/")) {
+    return OPENROUTER_API_KEY;
   }
 
   throw new Error(`Unknown model provider for model: ${model}`);
