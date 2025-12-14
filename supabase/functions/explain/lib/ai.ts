@@ -1,6 +1,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateObject, generateText } from "ai";
 import { z } from "zod";
 import type { SlangContext, SlangData } from "./types.ts";
@@ -13,14 +14,14 @@ import {
 } from "./prompts.ts";
 import {
   ANTHROPIC_MODELS,
-  CEREBRAS_MODELS,
   GEMINI_MODELS,
   GPT_MODELS,
+  OPENROUTER_MODELS,
   type SUPPORTED_ANTHROPIC_MODELS,
-  type SUPPORTED_CEREBRAS_MODELS,
   type SUPPORTED_GEMINI_MODELS,
   type SUPPORTED_GPT_MODELS,
   type SUPPORTED_MODELS,
+  type SUPPORTED_OPENROUTER_MODELS,
 } from "./config.ts";
 
 // Type guard functions
@@ -40,10 +41,10 @@ const isAnthropicModel = (
   return ANTHROPIC_MODELS.includes(model as SUPPORTED_ANTHROPIC_MODELS);
 };
 
-const isCerebrasModel = (
+const isOpenRouterModel = (
   model: SUPPORTED_MODELS,
-): model is SUPPORTED_CEREBRAS_MODELS => {
-  return CEREBRAS_MODELS.includes(model as SUPPORTED_CEREBRAS_MODELS);
+): model is SUPPORTED_OPENROUTER_MODELS => {
+  return OPENROUTER_MODELS.includes(model as SUPPORTED_OPENROUTER_MODELS);
 };
 
 // Initialize providers
@@ -72,10 +73,9 @@ const getModel = (modelName: SUPPORTED_MODELS, apiKey: string) => {
     return anthropic(modelName);
   }
 
-  // Check if it's a Cerebras model (via OpenRouter)
-  if (isCerebrasModel(modelName)) {
-    const openrouter = createOpenAI({
-      baseURL: "https://openrouter.ai/api/v1",
+  // Check if it's an OpenRouter model (runs on Cerebras hardware)
+  if (isOpenRouterModel(modelName)) {
+    const openrouter = createOpenRouter({
       apiKey,
     });
     return openrouter(modelName);
@@ -84,7 +84,12 @@ const getModel = (modelName: SUPPORTED_MODELS, apiKey: string) => {
   // If no match, throw an error
   throw new Error(
     `Unsupported model: ${modelName}. Supported models are: ${
-      [...GPT_MODELS, ...GEMINI_MODELS, ...ANTHROPIC_MODELS, ...CEREBRAS_MODELS].join(", ")
+      [
+        ...GPT_MODELS,
+        ...GEMINI_MODELS,
+        ...ANTHROPIC_MODELS,
+        ...OPENROUTER_MODELS,
+      ].join(", ")
     }`,
   );
 };
@@ -129,9 +134,9 @@ export async function generateExplanation(
       model: modelInstance,
       system: SYSTEM_PROMPT,
       prompt: buildExplanationPrompt(context),
-      temperature: 0.3,        // Changed from 0.1 (better format compliance)
-      topP: 0.95,              // Slightly higher for better instruction following
-      abortSignal: controller.signal,  // Added (timeout protection)
+      temperature: 0.3, // Changed from 0.1 (better format compliance)
+      topP: 0.95, // Slightly higher for better instruction following
+      abortSignal: controller.signal, // Added (timeout protection)
     });
     const endTime = performance.now();
     const duration = endTime - startTime;
@@ -158,7 +163,9 @@ export async function generateExplanation(
       console.log(`[Performance] Completion tokens: ${completionTokens}`);
       console.log(`[Performance] Total tokens: ${totalTokens}`);
       if (completionTokens > 0) {
-        const tokensPerSecond = (completionTokens / (duration / 1000)).toFixed(2);
+        const tokensPerSecond = (completionTokens / (duration / 1000)).toFixed(
+          2,
+        );
         console.log(`[Performance] Speed: ${tokensPerSecond} tokens/sec`);
       }
     }
@@ -269,7 +276,9 @@ export async function generateGrammarAnalysis(
       console.log(`[Grammar Analysis] Completion tokens: ${completionTokens}`);
       console.log(`[Grammar Analysis] Total tokens: ${totalTokens}`);
       if (completionTokens > 0) {
-        const tokensPerSecond = (completionTokens / (duration / 1000)).toFixed(2);
+        const tokensPerSecond = (completionTokens / (duration / 1000)).toFixed(
+          2,
+        );
         console.log(`[Grammar Analysis] Speed: ${tokensPerSecond} tokens/sec`);
       }
     }

@@ -39,11 +39,9 @@ export function resolveApiKey(model: SUPPORTED_MODELS): string {
     return OPENAI_API_KEY;
   } else if (modelLower.startsWith("claude")) {
     return ANTHROPIC_API_KEY;
-  } else if (modelLower.startsWith("cerebras/")) {
-    return OPENROUTER_API_KEY;
   }
 
-  throw new Error(`Unknown model provider for model: ${model}`);
+  return OPENROUTER_API_KEY;
 }
 
 export function detectLanguage(text: string): Language {

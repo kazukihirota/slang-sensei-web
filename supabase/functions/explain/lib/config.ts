@@ -19,21 +19,24 @@ export const GEMINI_MODELS = [
   "gemini-2.5-pro",
 ] as const;
 export const ANTHROPIC_MODELS = ["claude-haiku-4-5-20251001"] as const;
-export const CEREBRAS_MODELS = [
-  "cerebras/llama-3.3-70b",
-  "cerebras/llama3.1-8b",
+// OpenRouter models (run on Cerebras hardware via provider routing)
+export const OPENROUTER_MODELS = [
+  "meta-llama/llama-3.3-70b-instruct",
+  "meta-llama/llama-3.1-8b-instruct",
+  "openai/gpt-oss-120b",
+  "google/gemini-2.5-flash-lite",
 ] as const;
 
 // Derive types from the arrays
 export type SUPPORTED_GPT_MODELS = (typeof GPT_MODELS)[number];
 export type SUPPORTED_GEMINI_MODELS = (typeof GEMINI_MODELS)[number];
 export type SUPPORTED_ANTHROPIC_MODELS = (typeof ANTHROPIC_MODELS)[number];
-export type SUPPORTED_CEREBRAS_MODELS = (typeof CEREBRAS_MODELS)[number];
+export type SUPPORTED_OPENROUTER_MODELS = (typeof OPENROUTER_MODELS)[number];
 export type SUPPORTED_MODELS =
   | SUPPORTED_GPT_MODELS
   | SUPPORTED_GEMINI_MODELS
   | SUPPORTED_ANTHROPIC_MODELS
-  | SUPPORTED_CEREBRAS_MODELS;
+  | SUPPORTED_OPENROUTER_MODELS;
 
-// Default model (Cerebras via OpenRouter for fast inference)
-export const DEFAULT_MODEL: SUPPORTED_MODELS = "cerebras/llama-3.3-70b";
+// Default model (Llama 3.3 70B via OpenRouter/Cerebras for fast inference)
+export const DEFAULT_MODEL: SUPPORTED_MODELS = "google/gemini-2.5-flash-lite";
