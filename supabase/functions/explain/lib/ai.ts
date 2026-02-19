@@ -77,6 +77,11 @@ const getModel = (modelName: SUPPORTED_MODELS, apiKey: string) => {
   if (isOpenRouterModel(modelName)) {
     const openrouter = createOpenRouter({
       apiKey,
+      extraBody: {
+        provider: {
+          only: ["Cerebras"],
+        },
+      },
     });
     return openrouter(modelName);
   }
@@ -130,7 +135,7 @@ export async function generateExplanation(
 
   try {
     const startTime = performance.now();
-    const { text, usage } = await generateText({
+    const { text, usage, response } = await generateText({
       model: modelInstance,
       system: SYSTEM_PROMPT,
       prompt: buildExplanationPrompt(context),
@@ -143,6 +148,14 @@ export async function generateExplanation(
 
     // Log performance metrics
     console.log(`[Performance] Model: ${model}`);
+    // Log provider info from OpenRouter response headers
+    const headers = response?.headers as Record<string, string> | undefined;
+    if (headers) {
+      const provider = headers["x-provider"] || headers["x-served-by"];
+      if (provider) {
+        console.log(`[Performance] Provider: ${provider}`);
+      }
+    }
     console.log(
       `[Performance] Duration: ${duration.toFixed(2)}ms (${
         (duration / 1000).toFixed(2)
@@ -245,7 +258,7 @@ export async function generateGrammarAnalysis(
 
   try {
     const startTime = performance.now();
-    const { text, usage } = await generateText({
+    const { text, usage, response } = await generateText({
       model: modelInstance,
       system: GRAMMAR_SYSTEM_PROMPT,
       prompt: buildGrammarAnalysisPrompt(sentence),
@@ -258,6 +271,14 @@ export async function generateGrammarAnalysis(
 
     // Log performance metrics
     console.log(`[Grammar Analysis] Model: ${model}`);
+    // Log provider info from OpenRouter response headers
+    const headers = response?.headers as Record<string, string> | undefined;
+    if (headers) {
+      const provider = headers["x-provider"] || headers["x-served-by"];
+      if (provider) {
+        console.log(`[Grammar Analysis] Provider: ${provider}`);
+      }
+    }
     console.log(
       `[Grammar Analysis] Duration: ${duration.toFixed(2)}ms (${
         (duration / 1000).toFixed(2)

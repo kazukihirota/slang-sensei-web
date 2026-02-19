@@ -25,6 +25,7 @@ export const OPENROUTER_MODELS = [
   "meta-llama/llama-3.1-8b-instruct",
   "openai/gpt-oss-120b",
   "google/gemini-2.5-flash-lite",
+  "qwen/qwen3-235b-a22b-2507",
 ] as const;
 
 // Derive types from the arrays
@@ -39,4 +40,4 @@ export type SUPPORTED_MODELS =
   | SUPPORTED_OPENROUTER_MODELS;
 
 // Default model (Llama 3.3 70B via OpenRouter/Cerebras for fast inference)
-export const DEFAULT_MODEL: SUPPORTED_MODELS = "google/gemini-2.5-flash-lite";
+export const DEFAULT_MODEL: SUPPORTED_MODELS = "qwen/qwen3-235b-a22b-2507";
